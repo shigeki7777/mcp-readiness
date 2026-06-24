@@ -3,6 +3,7 @@
 import { auditServer } from "../src/audit.mjs";
 
 const OBSERVATORY = "https://live-vps.sasame.online/public-mcp";
+const REPO = "https://github.com/shigeki7777/mcp-readiness";
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
 const noColor = has("--no-color") || process.env.NO_COLOR;
@@ -88,6 +89,8 @@ const ok = (b) => (b ? C("32", "PASS") : C("31", "FAIL"));
   console.log("");
   console.log(`  ${dim("Reproduce / track grade over time at the SaSame MCP Observatory:")}`);
   console.log(`  ${dim(OBSERVATORY + "  (free, no key)")}`);
+  console.log(`  ${dim("Think a check is wrong or unfair to your server? We'd genuinely like to be")}`);
+  console.log(`  ${dim("corrected — open an issue: " + REPO + "/issues")}`);
   console.log("");
   process.exit(g === "A" || g === "B" ? 0 : 1);
 })();
