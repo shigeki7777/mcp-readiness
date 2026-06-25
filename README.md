@@ -8,6 +8,8 @@ Zero dependencies. Zero config. Zero telemetry. Runs anywhere Node 18+ runs.
 npx mcp-readiness https://mcp.example.com/mcp
 ```
 
+A real run — a strong server that's **one fix from a clean directory pre-flight** (one criterion to address, not a verdict on your work):
+
 ```
   MCP Readiness    B    9/10 criteria  ·  11 tools  ·  134ms
   https://mcp.example.com/mcp
@@ -74,7 +76,7 @@ Each is bound to the MCP spec or a direct measurement — not taste. Grade: **A*
 
 It also runs an **advisory directory pre-flight** mapping to documented mechanical reject reasons for
 the Claude Connectors and ChatGPT Apps directories (missing titles/annotations, promotional or generic
-tool names, missing privacy-policy signal).
+tool names, missing privacy-policy signal). About to submit? The [directory pre-flight guide](https://shigeki7777.github.io/sasame-mcp-observatory/preflight.html) lists what each directory checks — and what's out of scope (privacy-policy content, identity verification, OAuth), so you handle those yourself.
 
 ### Safety
 
