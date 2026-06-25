@@ -100,6 +100,15 @@ companion that has crawled and re-measured thousands of public MCP servers over 
 you how a server's grade *moved* across days (improving / degrading), with ed25519-signed,
 offline-verifiable certificates. This CLI runs the same criteria the Observatory uses.
 
-## License
+## License & what's open vs. what's the service
 
-MIT © SaSame MCP Observatory. Use it, fork it, wire it into your build.
+The CLI is **MIT** — use it, fork it, sell it, wire it into your build. Copying the code is encouraged;
+that's the point. The 10 criteria and the grading logic are open by design.
+
+What forking the code *doesn't* give you is the hosted [SaSame MCP Observatory](https://live-vps.sasame.online/public-mcp):
+the continuous re-measurement of thousands of public MCP servers over time, the longitudinal
+grade-over-time history (improving / degrading), and the ed25519-**signed** certificates — anyone can
+verify a certificate offline, but only SaSame *issues* them. This CLI grades a server **right now**
+(something you can reproduce yourself); the Observatory is the service that remembers how it **moved**.
+
+MIT © SaSame SRL.
