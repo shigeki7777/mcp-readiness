@@ -1,0 +1,31 @@
+name: Publish npm package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@latest
+      - run: npm test
+      - name: Require an unpublished package version
+        shell: bash
+        run: |
+          local_version=$(node -p "require('./package.json').version")
+          published_version=$(npm view mcp-readiness version)
+          test "$local_version" != "$published_version" || {
+            echo "mcp-readiness@$local_version is already published"
+            exit 1
+          }
+      - run: npm publish --access public --provenance
