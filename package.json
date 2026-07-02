@@ -1,6 +1,6 @@
 {
   "name": "mcp-readiness",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Lighthouse for MCP servers — grade any public Model Context Protocol server against 10 spec-bound readiness criteria (handshake, tool quality, safety annotations, anti-ghost content, token efficiency, honest errors) + a Claude/ChatGPT directory pre-flight. Zero deps, runs anywhere with npx.",
   "type": "module",
   "bin": {
@@ -10,7 +10,9 @@
     ".": "./src/audit.mjs"
   },
   "files": [
+    "action.yml",
     "bin",
+    "examples",
     "src",
     "README.md",
     "LICENSE"
@@ -19,7 +21,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "audit": "node bin/cli.mjs"
+    "audit": "node bin/cli.mjs",
+    "test": "node test/action.test.mjs"
   },
   "keywords": [
     "mcp",

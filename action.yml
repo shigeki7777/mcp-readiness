@@ -1,0 +1,43 @@
+name: SaSame MCP Readiness
+description: Grade an MCP server in CI and publish a useful pull-request check summary.
+author: SaSame SRL
+
+branding:
+  icon: check-circle
+  color: green
+
+inputs:
+  endpoint:
+    description: Public or locally-started Streamable HTTP MCP endpoint to audit.
+    required: true
+  min-grade:
+    description: Lowest accepted grade (A, B, C, or D).
+    required: false
+    default: B
+  report-path:
+    description: Optional path for the full JSON report.
+    required: false
+    default: mcp-readiness-report.json
+
+outputs:
+  grade:
+    description: Measured readiness grade (A-D).
+    value: ${{ steps.audit.outputs.grade }}
+  passes:
+    description: Number of passing criteria.
+    value: ${{ steps.audit.outputs.passes }}
+  report-path:
+    description: Path to the JSON report.
+    value: ${{ steps.audit.outputs.report-path }}
+
+runs:
+  using: composite
+  steps:
+    - id: audit
+      name: Audit MCP readiness
+      shell: bash
+      env:
+        SASAME_MCP_ENDPOINT: ${{ inputs.endpoint }}
+        SASAME_MIN_GRADE: ${{ inputs.min-grade }}
+        SASAME_REPORT_PATH: ${{ inputs.report-path }}
+      run: node "$GITHUB_ACTION_PATH/bin/action.mjs"

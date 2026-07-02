@@ -1,0 +1,20 @@
+name: MCP readiness
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shigeki7777/mcp-readiness@v1
+        with:
+          endpoint: ${{ vars.MCP_ENDPOINT }}
+          min-grade: B

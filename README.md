@@ -8,6 +8,21 @@ Zero dependencies. Zero config. Zero telemetry. Runs anywhere Node 18+ runs.
 npx mcp-readiness https://mcp.example.com/mcp
 ```
 
+## Put it on every pull request
+
+```yaml
+- uses: shigeki7777/mcp-readiness@v1
+  with:
+    endpoint: ${{ vars.MCP_ENDPOINT }}
+    min-grade: B
+```
+
+The Action writes the complete result into the GitHub Step Summary, emits annotations for failed
+criteria, saves `mcp-readiness-report.json`, and fails when the measured grade drops below the
+configured threshold. It needs no token and sends no telemetry to SaSame. For a server started by
+the workflow, pass its localhost Streamable HTTP URL instead. A complete workflow is in
+[`examples/readiness.yml`](examples/readiness.yml).
+
 A real run — a strong server that's **one fix from a clean directory pre-flight** (one criterion to address, not a verdict on your work):
 
 ```
