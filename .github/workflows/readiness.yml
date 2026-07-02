@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm test
-      - uses: ./
+      - uses: shigeki7777/mcp-readiness@v1
         with:
           endpoint: https://live-vps.sasame.online/public-mcp
           min-grade: B
