@@ -1,0 +1,21 @@
+name: MCP readiness self-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  action-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm test
+      - uses: ./
+        with:
+          endpoint: https://live-vps.sasame.online/public-mcp
+          min-grade: B
