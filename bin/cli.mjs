@@ -4,6 +4,7 @@ import { auditServer } from "../src/audit.mjs";
 
 const OBSERVATORY = "https://live-vps.sasame.online/public-mcp";
 const REPO = "https://github.com/shigeki7777/mcp-readiness";
+const CLAIM = "https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml";
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
 const noColor = has("--no-color") || process.env.NO_COLOR;
@@ -35,6 +36,7 @@ ${bold("Exit codes")}  0 = grade A/B · 1 = grade C/D · 2 = usage/connection er
 ${bold("Flags")}  --json machine-readable · --no-color plain output
 
 Grades reproduce the hosted SaSame MCP Observatory (grade-over-time, signed certs): ${OBSERVATORY}
+If this is your MCP, claim the free owner-controlled Passport after the grade: ${CLAIM}
 `);
 }
 
@@ -54,8 +56,15 @@ const ok = (b) => (b ? C("32", "PASS") : C("31", "FAIL"));
     process.exit(2);
   }
 
+  const claimHint = {
+    if_this_is_your_server: "Claim the free SaSame MCP Readiness Passport after this local grade.",
+    github_claim_template: CLAIM,
+    mcp_next_call: "Connect https://live-vps.sasame.online/public-mcp and call claim_start(url) then claim_confirm.",
+    boundary: "Owner-controlled readiness record only; not a malware scan, endorsement, paid ranking, custody relationship, or tax document."
+  };
+
   if (asJson) {
-    console.log(JSON.stringify(a, null, 2));
+    console.log(JSON.stringify({ ...a, claim_hint: claimHint }, null, 2));
     process.exit(a.grade === "A" || a.grade === "B" ? 0 : 1);
   }
 
@@ -89,6 +98,9 @@ const ok = (b) => (b ? C("32", "PASS") : C("31", "FAIL"));
   console.log("");
   console.log(`  ${dim("Reproduce / track grade over time at the SaSame MCP Observatory:")}`);
   console.log(`  ${dim(OBSERVATORY + "  (free, no key)")}`);
+  console.log(`  ${bold("Claim this server")}  ${dim("If this is your MCP, claim the free owner-controlled Passport:")}`);
+  console.log(`  ${dim(CLAIM)}`);
+  console.log(`  ${dim("Or connect the SaSame public MCP and call claim_start(url) → claim_confirm.")}`);
   console.log(`  ${dim("Think a check is wrong or unfair to your server? We'd genuinely like to be")}`);
   console.log(`  ${dim("corrected — open an issue: " + REPO + "/issues")}`);
   console.log("");

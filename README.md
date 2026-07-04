@@ -8,6 +8,16 @@ Zero dependencies. Zero config. Zero telemetry. Runs anywhere Node 18+ runs.
 npx mcp-readiness https://mcp.example.com/mcp
 ```
 
+If this is **your** MCP server, the next step after the grade is to claim the public SaSame Readiness Passport:
+
+```text
+1. Run: npx mcp-readiness https://your-server.example/mcp
+2. Open: https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml
+3. Or connect the SaSame public MCP and call: claim_start(url) → claim_confirm
+```
+
+Claiming is free. It proves owner control; it does **not** create a safety endorsement, paid ranking, custody relationship, or tax document.
+
 ## Put it on every pull request
 
 ```yaml
@@ -71,6 +81,14 @@ Use it in CI — it exits non-zero when a server drops below a B:
 ```bash
 npx mcp-readiness <url> --json          # machine-readable full report
 ```
+
+## After the grade: claim the Passport
+
+`mcp-readiness` is the local, reproducible check. The hosted SaSame MCP Observatory adds the public record: an owner-controlled Readiness Passport, signed certificates, badge snippets, and grade-over-time history.
+
+- If the endpoint is yours: claim it free with `claim_start(url)` → `claim_confirm` on `https://live-vps.sasame.online/public-mcp`.
+- If you prefer GitHub: open the claim template at `https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml`.
+- If you are checking a peer: use the grade as a mechanical pre-flight only; it is not a malware scan, endorsement, or quality verdict.
 
 ## The 10 criteria
 
