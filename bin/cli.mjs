@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // mcp-readiness CLI — `npx mcp-readiness <url>` grades a public MCP server against 10 readiness criteria.
 import { auditServer } from "../src/audit.mjs";
+import { runGoldRush, renderGoldRush, DEFAULT_ENDPOINT } from "../src/gold-rush.mjs";
 
 const OBSERVATORY = "https://live-vps.sasame.online/public-mcp";
 const REPO = "https://github.com/shigeki7777/mcp-readiness";
 const CLAIM = "https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml";
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
+const flagVal = (f) => { const i = args.indexOf(f); return i >= 0 && args[i + 1] ? args[i + 1] : null; };
 const noColor = has("--no-color") || process.env.NO_COLOR;
 const asJson = has("--json");
 const url = args.find((a) => /^https?:\/\//.test(a));
@@ -32,12 +34,40 @@ ${bold("What it checks")} (10 criteria, A>=10 · B>=8 · C>=5 · D below)
   C8 machine identity   C9 token efficiency   C10 honest errors
   + advisory Claude/ChatGPT directory pre-flight
 
-${bold("Exit codes")}  0 = grade A/B · 1 = grade C/D · 2 = usage/connection error
+${bold("Gold Rush v1 handoff")} (drives SaSame's public MCP — measurement only, no payment, no key)
+  npx mcp-readiness gold-rush start <mcp-url> [--goal <preset>]   # create/identify a package
+  npx mcp-readiness gold-rush status <package-id>                 # read append-only package state
+  npx mcp-readiness gold-rush run <package-id>                    # advance one deterministic safe step
+  npx mcp-readiness gold-rush report <package-id>                 # produce the Visibility Report
+  (add --json for machine output · --endpoint <url> to target another SaSame public MCP)
+
+${bold("Exit codes")}  0 = grade A/B (or gold-rush ok) · 1 = grade C/D (or tool error) · 2 = usage/connection error
 ${bold("Flags")}  --json machine-readable · --no-color plain output
 
 Grades reproduce the hosted SaSame MCP Observatory (grade-over-time, signed certs): ${OBSERVATORY}
 If this is your MCP, claim the free owner-controlled Passport after the grade: ${CLAIM}
 `);
+}
+
+// Gold Rush v1 handoff mode (must run BEFORE the url-based audit — `gold-rush start
+// <mcp-url>` contains a URL that would otherwise trigger an audit).
+if (args[0] === "gold-rush") {
+  if (has("-h") || has("--help") || !args[1]) { help(); process.exit(args[1] ? 0 : 2); }
+  const sub = args[1];
+  // positional value = first non-flag after the subcommand that isn't a --goal/--endpoint value
+  const positional = args.slice(2).filter((a, i, arr) => !a.startsWith("-") && !(arr[i - 1] === "--goal" || arr[i - 1] === "--endpoint"));
+  const value = positional[0];
+  const opts = { goal: flagVal("--goal") || undefined, endpoint: flagVal("--endpoint") || DEFAULT_ENDPOINT };
+  try {
+    const result = await runGoldRush(sub, value, opts);
+    const failed = result.data && result.data.ok === false;
+    if (asJson) console.log(JSON.stringify(result.data, null, 2));
+    else console.log(renderGoldRush(result, { color: C }));
+    process.exit(failed ? 1 : 0);
+  } catch (e) {
+    console.error(C("31", "gold-rush error: ") + String((e && e.message) || e));
+    process.exit(2);
+  }
 }
 
 if (has("-h") || has("--help") || !url) {

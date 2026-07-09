@@ -90,6 +90,25 @@ npx mcp-readiness <url> --json          # machine-readable full report
 - If you prefer GitHub: open the claim template at `https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml`.
 - If you are checking a peer: use the grade as a mechanical pre-flight only; it is not a malware scan, endorsement, or quality verdict.
 
+## Gold Rush v1 handoff (optional)
+
+Beyond the local grade, `mcp-readiness` can drive SaSame's **Gold Rush Agent Package** over the public MCP — one guided journey that records what happened to an MCP: a package record, a visibility baseline, a runtime-health snapshot, a Visibility Report, and a replayable receipt. *Directories list MCPs. Gold Rush records what happened to them.*
+
+```bash
+npx mcp-readiness gold-rush start  https://mcp.example.com/mcp    # create/identify a package -> package_id
+npx mcp-readiness gold-rush run    <package-id>                   # advance one deterministic safe step
+npx mcp-readiness gold-rush status <package-id>                   # read append-only package state
+npx mcp-readiness gold-rush report <package-id>                   # produce the Visibility Report
+```
+
+- Add `--json` for machine output, `--goal <preset>` on `start` (e.g. `quick_claim`, `visibility_check`), or `--endpoint <url>` to target another SaSame public MCP.
+- No API key. The public surface is free and needs no token; this CLI sends no credentials.
+- **Boundaries (non-negotiable):** measurement record, **not** endorsement · claim status, **not** identity/KYC verification · runtime health, **not** a security verdict · receipt, **not** a fiscal invoice or payment guarantee.
+- **No payment:** these commands never trigger live settlement, DNS changes, wallet publication, external account creation, legal, or KYC actions.
+- Methodology (what is / is not measured): <https://live-vps.sasame.online/observatory/methodology.html>
+
+The existing `npx mcp-readiness <url>` audit works exactly as before — Gold Rush mode is purely additive.
+
 ## The 10 criteria
 
 Each is bound to the MCP spec or a direct measurement — not taste. Grade: **A** ≥10 · **B** ≥8 · **C** ≥5 · **D** below. (A server that never returns verifiable content is capped at **B** — honesty cap.)
