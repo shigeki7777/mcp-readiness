@@ -6,6 +6,14 @@ import { runGoldRush, renderGoldRush, DEFAULT_ENDPOINT } from "../src/gold-rush.
 const OBSERVATORY = "https://live-vps.sasame.online/public-mcp";
 const REPO = "https://github.com/shigeki7777/mcp-readiness";
 const CLAIM = "https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml";
+// Activation: a server can be DISCOVERED (crawled) without ever being CALLED.
+// baseline = free, hosted, measurement-only; repair = paid, refund if no baseline.
+// (Per-host deep links planned once a host route exists on the Observatory.)
+const ACTIVATION = {
+  baseline_url: "https://live-vps.sasame.online/observatory/check/",
+  repair_url: "https://buy.stripe.com/14A9ATbezeuicyBdED1ZS1p",
+  price_usd: 99,
+};
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
 const flagVal = (f) => { const i = args.indexOf(f); return i >= 0 && args[i + 1] ? args[i + 1] : null; };
@@ -94,7 +102,7 @@ const ok = (b) => (b ? C("32", "PASS") : C("31", "FAIL"));
   };
 
   if (asJson) {
-    console.log(JSON.stringify({ ...a, claim_hint: claimHint }, null, 2));
+    console.log(JSON.stringify({ ...a, claim_hint: claimHint, activation: ACTIVATION }, null, 2));
     process.exit(a.grade === "A" || a.grade === "B" ? 0 : 1);
   }
 
@@ -131,6 +139,13 @@ const ok = (b) => (b ? C("32", "PASS") : C("31", "FAIL"));
   console.log(`  ${bold("Claim this server")}  ${dim("If this is your MCP, claim the free owner-controlled Passport:")}`);
   console.log(`  ${dim(CLAIM)}`);
   console.log(`  ${dim("Or connect the SaSame public MCP and call claim_start(url) → claim_confirm.")}`);
+  console.log("");
+  console.log(`  ${bold("Agents may DISCOVER this server without ever CALLING its tools.")}`);
+  console.log(`  Free activation baseline ${dim("(observed discovery vs. real tool calls)")}:`);
+  console.log(`    ${ACTIVATION.baseline_url}  ${dim("(find your server, or ask via /public-mcp start_here)")}`);
+  console.log(`  Paid activation repair ${dim("($99, before/after evidence, refund if no baseline)")}:`);
+  console.log(`    ${ACTIVATION.repair_url}`);
+  console.log("");
   console.log(`  ${dim("Think a check is wrong or unfair to your server? We'd genuinely like to be")}`);
   console.log(`  ${dim("corrected — open an issue: " + REPO + "/issues")}`);
   console.log("");

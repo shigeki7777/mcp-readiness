@@ -90,6 +90,24 @@ npx mcp-readiness <url> --json          # machine-readable full report
 - If you prefer GitHub: open the claim template at `https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml`.
 - If you are checking a peer: use the grade as a mechanical pre-flight only; it is not a malware scan, endorsement, or quality verdict.
 
+## Activation: discovered is not the same as called
+
+A good grade means agents *can* call your server — not that they *do*. Crawlers and directories
+may DISCOVER a server (fetch its `tools/list`) without any agent ever CALLING its tools.
+
+- **Free — activation baseline.** The hosted Observatory publishes what it has actually observed:
+  discovery events vs. real tool calls. Find your server at
+  <https://live-vps.sasame.online/observatory/check/>, or connect the SaSame public MCP
+  (`https://live-vps.sasame.online/public-mcp`) and call `start_here()` for the guided baseline.
+  Measurement only — the numbers can be zero, and a baseline is not an endorsement or a promise
+  of traffic.
+- **Paid — activation repair ($99, one-time).** SaSame repairs the mechanical reasons agents skip
+  a server and delivers **before/after external-call evidence** from the same baseline. If no
+  baseline can be produced for your server, you get a refund.
+  <https://buy.stripe.com/14A9ATbezeuicyBdED1ZS1p>
+- **Boundary:** measurement, not endorsement. No adoption guarantees — the evidence shows what
+  changed in observed external calls, not a promised outcome.
+
 ## Gold Rush v1 handoff (optional)
 
 Beyond the local grade, `mcp-readiness` can drive SaSame's **Gold Rush Agent Package** over the public MCP — one guided journey that records what happened to an MCP: a package record, a visibility baseline, a runtime-health snapshot, a Visibility Report, and a replayable receipt. *Directories list MCPs. Gold Rush records what happened to them.*

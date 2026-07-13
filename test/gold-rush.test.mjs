@@ -94,7 +94,25 @@ assert.equal((await run(["gold-rush", "report", "pkg_fixture_1", "--endpoint", E
   assert.equal(j.subject, ENDPOINT);
 }
 
-// 7. no token/secret leakage
+// 7. activation block (v0.3.1): appears in text + json output, no secrets
+{
+  const { stdout } = await run([ENDPOINT, "--no-color"]);
+  assert.ok(stdout.includes("Agents may DISCOVER this server without ever CALLING its tools."), "activation headline in text output");
+  assert.ok(stdout.includes("Free activation baseline"), "free baseline line present");
+  assert.ok(stdout.includes("https://live-vps.sasame.online/observatory/check/"), "baseline URL present");
+  assert.ok(stdout.includes("refund if no baseline"), "refund rule stated");
+  assert.ok(stdout.includes("https://buy.stripe.com/14A9ATbezeuicyBdED1ZS1p"), "repair URL present");
+  // no secret material in the printed report (narrow patterns; "Token efficiency" criterion is fine)
+  assert.ok(!/(sk_live_|sk_test_|rk_live_|ghp_[A-Za-z0-9]|npm_[A-Za-z0-9]|xox[bp]-|-----BEGIN|authorization:|x-api-key)/i.test(stdout), "activation output contains no secrets");
+  const { stdout: js } = await run([ENDPOINT, "--json", "--no-color"]);
+  const j = JSON.parse(js);
+  assert.ok(j.activation, "--json output has activation object");
+  assert.equal(j.activation.baseline_url, "https://live-vps.sasame.online/observatory/check/");
+  assert.equal(j.activation.repair_url, "https://buy.stripe.com/14A9ATbezeuicyBdED1ZS1p");
+  assert.equal(j.activation.price_usd, 99);
+}
+
+// 8. no token/secret leakage
 {
   const client = readFileSync(fileURLToPath(new URL("../src/gold-rush.mjs", import.meta.url)), "utf8");
   const both = client + readFileSync(CLI, "utf8");
