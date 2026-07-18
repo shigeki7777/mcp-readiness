@@ -8,6 +8,12 @@ Zero dependencies. Zero config. Zero telemetry. Runs anywhere Node 18+ runs.
 npx mcp-readiness https://mcp.example.com/mcp
 ```
 
+## Part of SaSame MCP Factory
+
+SaSame is one modular **MCP Factory**: a production, distribution, inspection and continuous-observation system for Model Context Protocol servers, covering every creator entry point — idea, blueprint, unfinished build, finished build, live MCP — in one Factory Lifecycle. `mcp-readiness` is the **forkable, local CLI that mirrors the Factory's own inspection engine**: the same 10 criteria the hosted Observatory uses, runnable by anyone, on their own machine, with no account and no telemetry.
+
+Sibling stations in the Factory: [sasame-mcp-observatory](https://github.com/shigeki7777/sasame-mcp-observatory) (inspection/observation station) · [sasame-mcp](https://github.com/shigeki7777/sasame-mcp) (public MCP entry point) · [gold-rush-town](https://github.com/shigeki7777/gold-rush-town) (public demonstration/engagement station). Public site: https://srl-sasame.com.
+
 If this is **your** MCP server, the next step after the grade is to claim the public SaSame Readiness Passport:
 
 ```text
