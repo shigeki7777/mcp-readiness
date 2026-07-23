@@ -4,15 +4,17 @@
 // the same per-criterion grade you'd get from the hosted Observatory. No signing, no keys,
 // no telemetry — plain `fetch` to the target you name. Node >= 18 (built-in fetch/AbortSignal).
 
-const SPEC = { mcp: "2025-11-25", registry_schema: "2025-09-29" };
+const SPEC = { mcp: "2025-11-25", registry_schema: "2025-12-11" };
+export const STANDARD_VERSION = "agent-tool-discoverability-standard/0.3";
+const PINNED_PROTOCOL = SPEC.mcp; // client-advertised MCP protocol version (fallback if server omits one)
 
 // ── transport: one MCP JSON-RPC call over streamable-http (SSE or plain JSON), session-aware ──
-async function mcp(url, method, params, sessionId, isNotification, { timeoutMs = 9000 } = {}) {
+async function mcp(url, method, params, sessionId, isNotification, { timeoutMs = 9000, protocolVersion } = {}) {
   const h = {
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
     "user-agent": "mcp-audit/0.1",
-    "mcp-protocol-version": SPEC.mcp,
+    "mcp-protocol-version": protocolVersion || PINNED_PROTOCOL,
   };
   if (sessionId) h["mcp-session-id"] = sessionId; // forward session for STATEFUL servers (else tools/list 400s)
   const msg = { jsonrpc: "2.0", method, params: params || {} };
@@ -33,17 +35,33 @@ async function mcp(url, method, params, sessionId, isNotification, { timeoutMs =
   return { status: r.status, json, raw: rawBody, sessionId: r.headers.get("mcp-session-id") || null };
 }
 
+// TRANSIENT RETRY (same style as the C7 probe's 2-attempt loop): initialize and tools/list get ONE retry
+// after ~800ms when a call fails at the NETWORK layer (mcp() returned status 0 / fetchError — a DNS blip,
+// connection reset, or timeout). We NEVER retry an HTTP status (a 401/500 is a real measurement, not a
+// blip) — so a single ~9s network blip can no longer mark a healthy server dead/failed.
+async function mcpWithRetry(url, method, params, sessionId, isNotification, opts) {
+  let t0 = Date.now();
+  let res = await mcp(url, method, params, sessionId, isNotification, opts);
+  if (res.status === 0) { // network-layer failure / timeout only (fetchError); HTTP statuses are real
+    await new Promise((r) => setTimeout(r, 800));
+    t0 = Date.now();
+    res = await mcp(url, method, params, sessionId, isNotification, opts);
+  }
+  res.latency_ms = Date.now() - t0; // latency of the FINAL attempt only — a retried blip must not fail C6
+  return res;
+}
+
 // ── the standard: 10 criteria, each bound to spec / measurement (not taste) ──
 export const STANDARD = [
   { id: "C1", name: "Protocol handshake conformance", from: "MCP spec " + SPEC.mcp + " — JSON-RPC 2.0 initialize MUST return protocolVersion + capabilities" },
   { id: "C2", name: "Tool listability", from: "MCP spec /server/tools — tools/list MUST return result.tools[]" },
-  { id: "C3", name: "Tool object validity", from: "valid name + non-empty description + a TYPED inputSchema (type:object or declared properties)" },
+  { id: "C3", name: "Tool object validity", from: "valid name + non-empty description + an object inputSchema (type:object, declared properties, OR a bare {} = a valid JSON Schema 'accepts anything' for no-arg tools; missing/null inputSchema rejected)" },
   { id: "C4", name: "Description sufficiency / selectability", from: "every description >=12 chars, median >=20, distinctness ratio >=0.6 (templated/duplicate descriptions are unselectable)" },
   { id: "C5", name: "Safety annotation presence", from: "MCP ToolAnnotations — a valid boolean hint (readOnly/destructive/idempotent/openWorld) on >=50% of tools" },
   { id: "C6", name: "Liveness & latency", from: "2xx initialize within <5000ms" },
   { id: "C7", name: "Returns real content (anti-ghost)", from: "a SAFE (read-only) tool returns substantive MCP content[] (non-echo); priced/x402 -> UNVERIFIED" },
   { id: "C8", name: "Machine-discoverable identity", from: "Official MCP Registry server.json " + SPEC.registry_schema + " — name/version self-description (serverInfo)" },
-  { id: "C9", name: "Token efficiency", from: "total tools/list payload bytes (token-bloat is a known ecosystem failure)" },
+  { id: "C9", name: "Token efficiency", from: "DECODED tools/list result payload bytes (Buffer.byteLength(JSON.stringify(result))) < 40000 (token-bloat is a known ecosystem failure)" },
   { id: "C10", name: "Honest error behavior", from: "JSON-RPC 2.0: malformed/unknown method returns a structured error, not a hang/crash" },
 ];
 
@@ -76,12 +94,16 @@ function directoryPreflight(tools, init) {
 
 // ── the audit: returns {grade, passes, total, criteria[], top_gap, preflight, ...} ──
 export async function auditServer(url) {
-  const t0 = Date.now();
-  const init = await mcp(url, "initialize", { protocolVersion: SPEC.mcp, capabilities: {}, clientInfo: { name: "mcp-audit", version: "0.1" } });
-  const latency_ms = Date.now() - t0;
+  const init = await mcpWithRetry(url, "initialize", { protocolVersion: PINNED_PROTOCOL, capabilities: {}, clientInfo: { name: "mcp-audit", version: "0.1" } });
+  const latency_ms = init.latency_ms;
   const sid = init.sessionId;
-  try { await mcp(url, "notifications/initialized", {}, sid, true); } catch (_) {}
-  const tl = await mcp(url, "tools/list", {}, sid);
+  // NEGOTIATED PROTOCOL VERSION: all post-initialize calls carry the protocolVersion the server returned
+  // (fallback: the pinned version if omitted). Per MCP spec a client sending an unsupported version header
+  // gets 400 on post-init calls — strict spec-compliant servers were false-negatived before this.
+  const proto = (init.json && init.json.result && typeof init.json.result.protocolVersion === "string" && init.json.result.protocolVersion) || PINNED_PROTOCOL;
+  const postOpts = { protocolVersion: proto };
+  try { await mcp(url, "notifications/initialized", {}, sid, true, postOpts); } catch (_) {}
+  const tl = await mcpWithRetry(url, "tools/list", {}, sid, false, postOpts);
   const ev = {}, c = {};
 
   const initOk = !!(init.json && init.json.result && init.json.result.protocolVersion && init.json.result.capabilities);
@@ -90,11 +112,13 @@ export async function auditServer(url) {
   const tools = (tl.json && tl.json.result && Array.isArray(tl.json.result.tools)) ? tl.json.result.tools : null;
   c.C2 = !!tools; ev.C2 = tools ? (tools.length + " tools") : "no result.tools[] (status " + tl.status + ")";
 
+  // C3 (v0.3): a bare {} is a VALID JSON Schema ("accepts anything"), legitimately emitted for no-arg
+  // tools — accepted since v0.3. Missing / null / non-object inputSchema is still rejected.
   const NAME = /^[A-Za-z0-9_-]{1,128}$/;
-  const schemaTyped = (sc) => !!(sc && typeof sc === "object" && !Array.isArray(sc) && (sc.type === "object" || (sc.properties && typeof sc.properties === "object")));
+  const schemaTyped = (sc) => !!(sc && typeof sc === "object" && !Array.isArray(sc) && (sc.type === "object" || (sc.properties && typeof sc.properties === "object") || Object.keys(sc).length === 0));
   const c3typed = tools ? tools.filter((x) => x && schemaTyped(x.inputSchema)).length : 0;
   c.C3 = !!(tools && tools.length && tools.every((x) => x && NAME.test(String(x.name || "")) && String(x.description || "").trim().length > 0 && schemaTyped(x.inputSchema)));
-  ev.C3 = tools ? (c3typed + "/" + tools.length + " tools: valid name + non-empty desc + typed inputSchema") : "n/a";
+  ev.C3 = tools ? (c3typed + "/" + tools.length + " tools: valid name + non-empty desc + object (or bare {}) inputSchema") : "n/a";
 
   let descOk = false;
   if (tools && tools.length) {
@@ -117,7 +141,7 @@ export async function auditServer(url) {
 
   // C7 returns real content (anti-ghost). Safety-first: only invoke read-only tools; empty args first, then
   // minimal valid args on a required-arg signal; multi-tool sample (pass if ANY read-only tool is substantive).
-  let realContent = false, deliveryNote = "not tested";
+  let realContent = false, deliveryNote = "not tested", c7DeclinedNoRo = false;
   const buildMinArgs = (schema) => {
     const out = {}; const req = (schema && Array.isArray(schema.required)) ? schema.required : [];
     const props = (schema && schema.properties) || {};
@@ -146,14 +170,14 @@ export async function auditServer(url) {
       for (let attempt = 0; attempt < 2; attempt++) {
         let transient = false, lastArgsStr = "{}";
         try {
-          let call = await mcp(url, "tools/call", { name: probe.name, arguments: {} }, sid);
+          let call = await mcp(url, "tools/call", { name: probe.name, arguments: {} }, sid, false, postOpts);
           if (isPaid(call)) { note = "delivery UNVERIFIED (priced/x402 — not paid)"; }
           else {
             let res = call.json && call.json.result;
             const needsArgs = !!((call.json && call.json.error) || (res && res.isError === true));
             if (isRo && needsArgs && probe.inputSchema && Array.isArray(probe.inputSchema.required) && probe.inputSchema.required.length) {
               const args = buildMinArgs(probe.inputSchema); lastArgsStr = JSON.stringify(args);
-              call = await mcp(url, "tools/call", { name: probe.name, arguments: args }, sid);
+              call = await mcp(url, "tools/call", { name: probe.name, arguments: args }, sid, false, postOpts);
               if (isPaid(call)) { note = "delivery UNVERIFIED (priced/x402 — not paid)"; res = null; }
               else res = call.json && call.json.result;
             }
@@ -186,17 +210,32 @@ export async function auditServer(url) {
       if (r.ok) { realContent = true; deliveryNote = r.note + (candidates.length > 1 ? " (sampled " + (i + 1) + "/" + candidates.length + " read-only tools)" : ""); break; }
       if (bestNote === "not tested" || /UNVERIFIED|empty\/echo|placeholder|JSON-RPC/.test(r.note)) bestNote = r.note;
     }
-    if (!realContent) deliveryNote = bestNote + (candidates.length > 1 ? " (sampled " + candidates.length + " read-only tools, none substantive)" : "");
+    if (!realContent) {
+      deliveryNote = bestNote + (candidates.length > 1 ? " (sampled " + candidates.length + " read-only tools, none substantive)" : "");
+      // HONESTY-CAP WORDING (booleans unchanged): when NO tool declares readOnlyHint we DECLINE to
+      // content-verify (we never fabricate args for undeclared-safety tools) — that is a declined probe,
+      // not a measured ghost. Only a clean empty on a genuine empty-args call keeps the ghost wording;
+      // priced/x402 keeps its own UNVERIFIED wording.
+      c7DeclinedNoRo = !isRo && !/empty\/echo\/placeholder|priced\/x402/.test(deliveryNote);
+    }
   }
   c.C7 = realContent; ev.C7 = deliveryNote;
 
   const si = init.json && init.json.result && init.json.result.serverInfo;
   c.C8 = !!(si && String(si.name || "").trim() && String(si.version || "").trim()); ev.C8 = si ? ("serverInfo: " + si.name + " " + (si.version || "(no version)")) : "no serverInfo";
 
-  const bytes = tl.raw ? tl.raw.length : 0; c.C9 = bytes > 0 && bytes < 40000; ev.C9 = "tools/list payload " + bytes + " bytes";
+  // C9 token efficiency (v0.3): measure the DECODED JSON result payload of tools/list — the raw SSE-framed
+  // body double-counted `event:`/`data:` framing and mismeasured chunked streams. Threshold unchanged (40000).
+  const bytes = (tl.json && tl.json.result) ? Buffer.byteLength(JSON.stringify(tl.json.result)) : 0;
+  c.C9 = bytes > 0 && bytes < 40000; ev.C9 = "decoded tools/list result payload " + bytes + " bytes";
 
-  const bad = await mcp(url, "this/method/does/not/exist", {}, sid);
-  c.C10 = !!(bad.json && bad.json.error && typeof bad.json.error === "object"); ev.C10 = bad.json && bad.json.error ? ("structured error code " + (bad.json.error.code)) : "no structured error";
+  // C10 honest error behavior — ISOLATED: a timeout/hang on the unknown-method probe is exactly the defect
+  // C10 measures (hang instead of structured error), so it fails ONLY C10 and never aborts the audit
+  // (the error-tolerant transport returns status 0 / fetchError instead of throwing). No retry here:
+  // hanging on an unknown method is the measurement, not a blip to smooth over.
+  const bad = await mcp(url, "this/method/does/not/exist", {}, sid, false, postOpts);
+  c.C10 = !!(bad.json && bad.json.error && typeof bad.json.error === "object");
+  ev.C10 = bad.json && bad.json.error ? ("structured error code " + (bad.json.error.code)) : (bad.fetchError ? "no response to unknown method within timeout — hang instead of structured error" : "no structured error");
 
   const passes = STANDARD.filter((s) => c[s.id] === true).length;
   const grade = gradeFrom(passes, !realContent);
@@ -204,7 +243,9 @@ export async function auditServer(url) {
   const fails = criteria.filter((x) => !x.pass);
   return {
     subject: url, audited_at: new Date().toISOString(), latency_ms, tool_count: tools ? tools.length : 0,
-    passes, total: STANDARD.length, grade, honesty_cap: !realContent ? "no verified real content -> grade capped at B" : null,
+    passes, total: STANDARD.length, grade,
+    standard_version: STANDARD_VERSION, // self-identifying: which standard produced these booleans
+    honesty_cap: !realContent ? (c7DeclinedNoRo ? "content verification declined (no readOnlyHint tool to safely probe) -> grade capped at B" : "no verified real content -> grade capped at B") : null,
     delivery: deliveryNote, criteria,
     top_gap: fails.length ? (fails[0].id + " " + fails[0].name + " — " + fails[0].evidence) : "none (passes all checks)",
     preflight: directoryPreflight(tools, init),

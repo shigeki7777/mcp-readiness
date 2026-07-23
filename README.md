@@ -4,15 +4,16 @@
 
 Zero dependencies. Zero config. Zero telemetry. Runs anywhere Node 18+ runs.
 
+> **Part of [SaSame MCP Factory](https://srl-sasame.com).** This CLI is the forkable, local twin of the
+> Factory's own inspection engine — the same 10 criteria the hosted [SaSame MCP
+> Observatory](https://github.com/shigeki7777/sasame-mcp-observatory) uses to continuously inspect and
+> observe MCP servers as they move through the Factory (idea → build → ship → distribute → observe →
+> repair). Run it standalone, or use the grade as the entry point into the Factory's public
+> [MCP server](https://github.com/shigeki7777/sasame-mcp-observatory) and [Gold Rush Town](https://github.com/shigeki7777/gold-rush-town) stations.
+
 ```bash
 npx mcp-readiness https://mcp.example.com/mcp
 ```
-
-## Part of SaSame MCP Factory
-
-SaSame is one modular **MCP Factory**: a production, distribution, inspection and continuous-observation system for Model Context Protocol servers, covering every creator entry point — idea, blueprint, unfinished build, finished build, live MCP — in one Factory Lifecycle. `mcp-readiness` is the **forkable, local CLI that mirrors the Factory's own inspection engine**: the same 10 criteria the hosted Observatory uses, runnable by anyone, on their own machine, with no account and no telemetry.
-
-Sibling stations in the Factory: [sasame-mcp-observatory](https://github.com/shigeki7777/sasame-mcp-observatory) (inspection/observation station) · [sasame-mcp](https://github.com/shigeki7777/sasame-mcp) (public MCP entry point) · [gold-rush-town](https://github.com/shigeki7777/gold-rush-town) (public demonstration/engagement station). Public site: https://srl-sasame.com.
 
 If this is **your** MCP server, the next step after the grade is to claim the public SaSame Readiness Passport:
 
@@ -81,8 +82,11 @@ npm i -g mcp-readiness && mcp-readiness <url>     # or install globally
 Use it in CI — it exits non-zero when a server drops below a B:
 
 ```yaml
-- run: npx mcp-readiness "$MCP_URL"     # exit 0 = A/B, 1 = C/D, 2 = connection/usage error
+- run: npx mcp-readiness "$MCP_URL"     # exit 0 = A/B, 1 = C/D, 2 = usage error (bad/missing arguments)
 ```
+
+An unreachable host is a measurement, not a usage error: the audit still completes all 10 criteria,
+grades **D**, and exits **1**. Exit code 2 fires only for usage errors (e.g. no URL given).
 
 ```bash
 npx mcp-readiness <url> --json          # machine-readable full report
@@ -135,20 +139,27 @@ The existing `npx mcp-readiness <url>` audit works exactly as before — Gold Ru
 
 ## The 10 criteria
 
-Each is bound to the MCP spec or a direct measurement — not taste. Grade: **A** ≥10 · **B** ≥8 · **C** ≥5 · **D** below. (A server that never returns verifiable content is capped at **B** — honesty cap.)
+Standard: `agent-tool-discoverability-standard/0.3` (the `--json` output embeds it as `standard_version`).
+Each criterion is bound to the MCP spec or a direct measurement — not taste. Grade: **A** =10 · **B** 8–9 · **C** 5–7 · **D** below. (A server that never returns verifiable content is capped at **B** — honesty cap.)
 
 | | Criterion | Bound to |
 |---|---|---|
 | C1 | Protocol handshake conformance | `initialize` returns `protocolVersion` + `capabilities` |
 | C2 | Tool listability | `tools/list` returns `result.tools[]` |
-| C3 | Tool object validity | valid name + non-empty description + typed `inputSchema` |
+| C3 | Tool object validity | valid name + non-empty description + object `inputSchema` (a bare `{}` — valid JSON Schema for no-arg tools — is accepted; missing/null is rejected) |
 | C4 | Description sufficiency | every desc ≥12 chars, median ≥20, ≥60% distinct |
 | C5 | Safety annotation presence | a boolean hint (`readOnlyHint`/`destructiveHint`/…) on ≥50% of tools |
 | C6 | Liveness & latency | 2xx `initialize` < 5000 ms |
 | C7 | Returns real content (anti-ghost) | a read-only tool returns substantive, non-echo content; priced/x402 → UNVERIFIED |
 | C8 | Machine-discoverable identity | `serverInfo` name + version |
-| C9 | Token efficiency | `tools/list` payload < 40 KB |
+| C9 | Token efficiency | decoded `tools/list` result payload < 40 KB |
 | C10 | Honest error behavior | unknown method → structured JSON-RPC error, not a hang |
+
+Measurement semantics (v0.3): `initialize` and `tools/list` get **one retry after ~800 ms** on a
+network-layer failure or timeout only — never on an HTTP error status (a 401/500 is a real
+measurement). All post-`initialize` calls echo the server's negotiated `protocolVersion` in the
+`mcp-protocol-version` header (falling back to the pinned spec version if the server omits it). A
+hang on the unknown-method probe fails only C10.
 
 It also runs an **advisory directory pre-flight** mapping to documented mechanical reject reasons for
 the Claude Connectors and ChatGPT Apps directories (missing titles/annotations, promotional or generic

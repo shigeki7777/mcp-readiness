@@ -49,7 +49,7 @@ ${bold("Gold Rush v1 handoff")} (drives SaSame's public MCP — measurement only
   npx mcp-readiness gold-rush report <package-id>                 # produce the Visibility Report
   (add --json for machine output · --endpoint <url> to target another SaSame public MCP)
 
-${bold("Exit codes")}  0 = grade A/B (or gold-rush ok) · 1 = grade C/D (or tool error) · 2 = usage/connection error
+${bold("Exit codes")}  0 = grade A/B (or gold-rush ok) · 1 = grade C/D incl. unreachable-D (or tool error) · 2 = usage error
 ${bold("Flags")}  --json machine-readable · --no-color plain output
 
 Grades reproduce the hosted SaSame MCP Observatory (grade-over-time, signed certs): ${OBSERVATORY}

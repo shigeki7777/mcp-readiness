@@ -1,6 +1,6 @@
 {
   "name": "mcp-readiness",
-  "version": "0.3.1",
+  "version": "0.4.1",
   "description": "Lighthouse for MCP servers — grade any public Model Context Protocol server against 10 spec-bound readiness criteria (handshake, tool quality, safety annotations, anti-ghost content, token efficiency, honest errors) + a Claude/ChatGPT directory pre-flight, plus a Gold Rush v1 handoff mode that drives SaSame's public MCP (package/visibility/report). Zero deps, runs anywhere with npx.",
   "type": "module",
   "bin": {
@@ -44,6 +44,6 @@
     "type": "git",
     "url": "git+https://github.com/shigeki7777/mcp-readiness.git"
   },
-  "homepage": "https://live-vps.sasame.online/public-mcp",
-  "author": "SaSame MCP Observatory"
+  "homepage": "https://srl-sasame.com",
+  "author": "SaSame MCP Factory"
 }
