@@ -92,9 +92,55 @@ function directoryPreflight(tools, init) {
   return out;
 }
 
-// ── the audit: returns {grade, passes, total, criteria[], top_gap, preflight, ...} ──
+// ── REVISION-AWARE HANDSHAKE ──────────────────────────────────────────────────
+// PINNED_PROTOCOL is our best guess, not every server's reality. Servers that validate the
+// MCP-Protocol-Version header before routing reject an unknown revision outright — and many of them
+// helpfully name what they DO support in error.data.supported, e.g.
+//   {"code":-32600,"message":"Unsupported MCP-Protocol-Version",
+//    "data":{"supported":["2024-11-05","2025-03-26","2025-06-18"],"requested":"2025-11-25"}}
+// Before 0.5.0 we sent one initialize at PINNED_PROTOCOL and gave up, so any server speaking only
+// pre-2025-11-25 revisions (most of the deployed ecosystem) failed C1, never reached tools/list, and
+// cascade-failed to a FALSE grade D with "0 tools". Now: honour the advertised list when the server
+// offers one, otherwise walk a real-world ladder. Bounded to 3 attempts so an uncooperative server
+// cannot stretch the audit's latency budget.
+export const LEGACY_FALLBACK_LADDER = ["2025-06-18", "2025-03-26", "2024-11-05"];
+
+function advisedRevisions(res) {
+  const d = res && res.json && res.json.error && res.json.error.data;
+  const list = d && (d.supported || d.supportedVersions);
+  return Array.isArray(list) ? list.filter((v) => typeof v === "string" && v.length > 0) : [];
+}
+
+function initializeOk(res) {
+  return !!(res && res.json && res.json.result && res.json.result.protocolVersion && res.json.result.capabilities);
+}
+
+async function initializeWithRevisionFallback(url) {
+  const candidates = [PINNED_PROTOCOL];
+  let res = null;
+  for (let i = 0; i < candidates.length && i < 3; i += 1) {
+    const revision = candidates[i];
+    res = await mcpWithRetry(url, "initialize", {
+      protocolVersion: revision,
+      capabilities: {},
+      clientInfo: { name: "mcp-audit", version: "0.1" },
+    }, null, false, { protocolVersion: revision });
+    res.offered_revision = revision;
+    res.revision_attempts = candidates.slice(0, i + 1);
+    if (initializeOk(res)) return res;
+    // Only a structured JSON-RPC rejection tells us anything about revisions. A network failure or an
+    // opaque 5xx is a real measurement of "unreachable/broken" — do not paper over it with retries.
+    const next = advisedRevisions(res).slice().sort().reverse()
+      .concat(LEGACY_FALLBACK_LADDER)
+      .find((v) => !candidates.includes(v));
+    if (!next) break;
+    candidates.push(next);
+  }
+  return res;
+}
+
 export async function auditServer(url) {
-  const init = await mcpWithRetry(url, "initialize", { protocolVersion: PINNED_PROTOCOL, capabilities: {}, clientInfo: { name: "mcp-audit", version: "0.1" } });
+  const init = await initializeWithRevisionFallback(url);
   const latency_ms = init.latency_ms;
   const sid = init.sessionId;
   // NEGOTIATED PROTOCOL VERSION: all post-initialize calls carry the protocolVersion the server returned
@@ -106,8 +152,16 @@ export async function auditServer(url) {
   const tl = await mcpWithRetry(url, "tools/list", {}, sid, false, postOpts);
   const ev = {}, c = {};
 
-  const initOk = !!(init.json && init.json.result && init.json.result.protocolVersion && init.json.result.capabilities);
-  c.C1 = initOk; ev.C1 = "initialize result keys: " + (init.json && init.json.result ? Object.keys(init.json.result).join(",") : "(none, status " + init.status + (init.fetchError ? ", " + init.fetchError : "") + ")");
+  const initOk = initializeOk(init);
+  const tried = Array.isArray(init.revision_attempts) && init.revision_attempts.length > 1
+    ? " (offered " + init.revision_attempts.join(" -> ") + ")"
+    : "";
+  c.C1 = initOk;
+  ev.C1 = initOk
+    ? "initialize negotiated " + proto + tried + "; result keys: " + Object.keys(init.json.result).join(",")
+    : "initialize failed" + tried + ": " + (init.json && init.json.error
+        ? "JSON-RPC " + init.json.error.code + " " + String(init.json.error.message || "").slice(0, 80)
+        : "(no result, status " + init.status + (init.fetchError ? ", " + init.fetchError : "") + ")");
 
   const tools = (tl.json && tl.json.result && Array.isArray(tl.json.result.tools)) ? tl.json.result.tools : null;
   c.C2 = !!tools; ev.C2 = tools ? (tools.length + " tools") : "no result.tools[] (status " + tl.status + ")";
@@ -116,9 +170,27 @@ export async function auditServer(url) {
   // tools — accepted since v0.3. Missing / null / non-object inputSchema is still rejected.
   const NAME = /^[A-Za-z0-9_-]{1,128}$/;
   const schemaTyped = (sc) => !!(sc && typeof sc === "object" && !Array.isArray(sc) && (sc.type === "object" || (sc.properties && typeof sc.properties === "object") || Object.keys(sc).length === 0));
-  const c3typed = tools ? tools.filter((x) => x && schemaTyped(x.inputSchema)).length : 0;
-  c.C3 = !!(tools && tools.length && tools.every((x) => x && NAME.test(String(x.name || "")) && String(x.description || "").trim().length > 0 && schemaTyped(x.inputSchema)));
-  ev.C3 = tools ? (c3typed + "/" + tools.length + " tools: valid name + non-empty desc + object (or bare {}) inputSchema") : "n/a";
+  // Evidence must name the dimension that actually failed. Before 0.5.0 this printed only the
+  // SCHEMA-passing count while labelling it as all three checks, so a server failing purely on the
+  // name charset saw "54/54 tools: valid name + non-empty desc + object inputSchema" next to a FAIL.
+  const c3bad = tools
+    ? {
+        name: tools.filter((x) => !(x && NAME.test(String(x.name || "")))),
+        desc: tools.filter((x) => !(x && String(x.description || "").trim().length > 0)),
+        schema: tools.filter((x) => !(x && schemaTyped(x.inputSchema))),
+      }
+    : null;
+  c.C3 = !!(tools && tools.length && !c3bad.name.length && !c3bad.desc.length && !c3bad.schema.length);
+  if (!tools) ev.C3 = "n/a";
+  else if (c.C3) ev.C3 = tools.length + "/" + tools.length + " tools: valid name + non-empty desc + object (or bare {}) inputSchema";
+  else {
+    const sample = (l) => l.slice(0, 3).map((x) => String((x && x.name) || "(unnamed)")).join(", ") + (l.length > 3 ? " …" : "");
+    const parts = [];
+    if (c3bad.name.length) parts.push(c3bad.name.length + "/" + tools.length + " name not /^[A-Za-z0-9_-]{1,128}$/ (" + sample(c3bad.name) + ")");
+    if (c3bad.desc.length) parts.push(c3bad.desc.length + "/" + tools.length + " empty description (" + sample(c3bad.desc) + ")");
+    if (c3bad.schema.length) parts.push(c3bad.schema.length + "/" + tools.length + " inputSchema not an object (" + sample(c3bad.schema) + ")");
+    ev.C3 = parts.join("; ");
+  }
 
   let descOk = false;
   if (tools && tools.length) {

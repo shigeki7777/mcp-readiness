@@ -4,6 +4,19 @@
 
 Zero dependencies. Zero config. Zero telemetry. Runs anywhere Node 18+ runs.
 
+> ### ⚠️ Graded something with 0.4.1 or earlier and got `D` / `0 tools`? Please re-run it on 0.5.0.
+>
+> Versions up to 0.4.1 sent a single `initialize` pinned to MCP revision `2025-11-25` and gave up if
+> it was rejected. Servers speaking only earlier revisions (`2025-06-18`, `2025-03-26`, `2024-11-05`
+> — most of the deployed ecosystem) failed the handshake, never reached `tools/list`, and
+> cascade-failed to a **false grade `D`**. 0.5.0 honours whatever revisions a server advertises and
+> falls back down a real ladder. A genuinely dead endpoint still grades `D`.
+>
+> Details, including the second fix (C3 evidence named the wrong failing dimension), are in
+> [CHANGELOG.md](./CHANGELOG.md). This was found because someone invited us to grade their server and
+> we got it wrong. If a check looks wrong or unfair to your server, please
+> [open an issue](https://github.com/shigeki7777/mcp-readiness/issues) — that is how this got fixed.
+
 > **Part of [SaSame MCP Factory](https://srl-sasame.com).** This CLI is the forkable, local twin of the
 > Factory's own inspection engine — the same 10 criteria the hosted [SaSame MCP
 > Observatory](https://github.com/shigeki7777/sasame-mcp-observatory) uses to continuously inspect and
