@@ -2,6 +2,27 @@
 
 All notable changes to `mcp-readiness`.
 
+## 0.6.0 — 2026-08-13
+
+### Changed — removed the stale $99 "activation repair" Stripe link (breaking JSON field)
+
+The README, `--help`/text output, and the `--json` `activation` object advertised a paid
+"activation repair ($99, one-time)" SKU with a live-looking Stripe buy link
+(`buy.stripe.com/14A9ATbezeuicyBdED1ZS1p`). That SKU no longer exists in the current SaSame
+Factory commercial model: the old "Activation" product line was retired, and its closest
+current analog (Assisted Review, EUR 99 one-time) currently has `price_state=APPROVED_NOT_LIVE`
+— i.e. not purchasable. Advertising a working-looking checkout link for a dead/non-purchasable
+product is worse than saying nothing.
+
+- `activation.repair_url` and `activation.price_usd` are **removed** from `--json` output
+  (breaking change for anything reading those fields — hence the minor bump on a 0.x package).
+- `activation.pricing_url` is **added**, pointing at `https://srl-sasame.com/pricing`, the live
+  page that always reflects current prices and `price_state` — this CLI does not hard-code prices.
+- Text output and the README no longer print a specific dollar figure or Stripe link for
+  activation repair; they state plainly that no such SKU is currently sold.
+- No change to the free activation baseline, the Gold Rush handoff commands, or any of the 10
+  readiness criteria.
+
 ## 0.5.0 — 2026-07-29
 
 ### Fixed — servers speaking only pre-2025-11-25 MCP revisions were given a FALSE grade D
