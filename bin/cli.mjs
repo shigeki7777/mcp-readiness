@@ -7,12 +7,14 @@ const OBSERVATORY = "https://live-vps.sasame.online/public-mcp";
 const REPO = "https://github.com/shigeki7777/mcp-readiness";
 const CLAIM = "https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml";
 // Activation: a server can be DISCOVERED (crawled) without ever being CALLED.
-// baseline = free, hosted, measurement-only; repair = paid, refund if no baseline.
-// (Per-host deep links planned once a host route exists on the Observatory.)
+// baseline = free, hosted, measurement-only. There is no live paid mechanical
+// "activation repair" SKU as of 2026-08-13 (the old $99 Stripe link and price
+// pointed at a retired product; the closest current SKU, Assisted Review, is
+// EUR 99 one-time but price_state=APPROVED_NOT_LIVE — not purchasable). Current
+// prices/availability are always read from pricing_url, never hard-coded here.
 const ACTIVATION = {
   baseline_url: "https://live-vps.sasame.online/observatory/check/",
-  repair_url: "https://buy.stripe.com/14A9ATbezeuicyBdED1ZS1p",
-  price_usd: 99,
+  pricing_url: "https://srl-sasame.com/pricing",
 };
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
@@ -143,8 +145,8 @@ const ok = (b) => (b ? C("32", "PASS") : C("31", "FAIL"));
   console.log(`  ${bold("Agents may DISCOVER this server without ever CALLING its tools.")}`);
   console.log(`  Free activation baseline ${dim("(observed discovery vs. real tool calls)")}:`);
   console.log(`    ${ACTIVATION.baseline_url}  ${dim("(find your server, or ask via /public-mcp start_here)")}`);
-  console.log(`  Paid activation repair ${dim("($99, before/after evidence, refund if no baseline)")}:`);
-  console.log(`    ${ACTIVATION.repair_url}`);
+  console.log(`  ${dim("No paid activation-repair SKU is currently sold. Current Factory plans/prices:")}`);
+  console.log(`    ${ACTIVATION.pricing_url}`);
   console.log("");
   console.log(`  ${dim("Think a check is wrong or unfair to your server? We'd genuinely like to be")}`);
   console.log(`  ${dim("corrected — open an issue: " + REPO + "/issues")}`);

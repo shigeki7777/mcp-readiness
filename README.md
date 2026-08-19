@@ -124,10 +124,11 @@ may DISCOVER a server (fetch its `tools/list`) without any agent ever CALLING it
   (`https://live-vps.sasame.online/public-mcp`) and call `start_here()` for the guided baseline.
   Measurement only — the numbers can be zero, and a baseline is not an endorsement or a promise
   of traffic.
-- **Paid — activation repair ($99, one-time).** SaSame repairs the mechanical reasons agents skip
-  a server and delivers **before/after external-call evidence** from the same baseline. If no
-  baseline can be produced for your server, you get a refund.
-  <https://buy.stripe.com/14A9ATbezeuicyBdED1ZS1p>
+- **Paid activation repair is not currently sold.** There is no live SKU for mechanical
+  activation repair today. Current SaSame Factory plans (Free Listing, Factory, Factory Pro,
+  Factory Team, Assisted Review) and their live purchasability (`price_state`) are always at
+  <https://srl-sasame.com/pricing> — check there rather than assuming anything below is still
+  accurate; this README does not hard-code prices.
 - **Boundary:** measurement, not endorsement. No adoption guarantees — the evidence shows what
   changed in observed external calls, not a promised outcome.
 
