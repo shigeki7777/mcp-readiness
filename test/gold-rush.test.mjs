@@ -54,10 +54,14 @@ function run(cliArgs, env = {}) {
   });
 }
 
-// 1. help includes Gold Rush commands
+// 1. help leads with current free beta and preserves legacy Gold Rush commands
 {
   const { stdout } = await run(["--help"]);
-  for (const c of ["gold-rush start", "gold-rush status", "gold-rush run", "gold-rush report"]) assert.ok(stdout.includes(c), `help includes '${c}'`);
+  assert.ok(stdout.includes("SaSame free beta handoff"), "help exposes the current SaSame handoff");
+  assert.ok(stdout.includes("https://srl-sasame.com/start"), "help points to the current /start path");
+  assert.ok(stdout.includes("free during beta, no payment method required"), "help states the current beta access boundary");
+  assert.ok(stdout.includes("Legacy compatibility — Gold Rush v1"), "Gold Rush is framed as legacy compatibility");
+  for (const c of ["gold-rush start", "gold-rush status", "gold-rush run", "gold-rush report"]) assert.ok(stdout.includes(c), `help preserves '${c}'`);
   assert.ok(stdout.includes("measurement only") || stdout.includes("measurement"), "help states measurement boundary");
 }
 
@@ -94,14 +98,16 @@ assert.equal((await run(["gold-rush", "report", "pkg_fixture_1", "--endpoint", E
   assert.equal(j.subject, ENDPOINT);
 }
 
-// 7. activation block (v0.3.1): appears in text + json output, no secrets
+// 7. activation/free-beta handoff: appears in text + json output, no secrets
 {
   const { stdout } = await run([ENDPOINT, "--no-color"]);
   assert.ok(stdout.includes("Agents may DISCOVER this server without ever CALLING its tools."), "activation headline in text output");
   assert.ok(stdout.includes("Free activation baseline"), "free baseline line present");
   assert.ok(stdout.includes("https://live-vps.sasame.online/observatory/check/"), "baseline URL present");
-  assert.ok(stdout.includes("No paid activation-repair SKU is currently sold"), "no-live-SKU note stated");
-  assert.ok(stdout.includes("https://srl-sasame.com/pricing"), "pricing URL present");
+  assert.ok(stdout.includes("Capability Control Beta is the current new-user path"), "current beta handoff stated");
+  assert.ok(stdout.includes("https://srl-sasame.com/start"), "current /start URL present");
+  assert.ok(stdout.includes("free during beta · no payment method required"), "current beta access boundary stated");
+  assert.ok(stdout.includes("https://srl-sasame.com/pricing"), "pricing URL retained as compatibility/current-availability reference");
   // no secret material in the printed report (narrow patterns; "Token efficiency" criterion is fine)
   assert.ok(!/(sk_live_|sk_test_|rk_live_|ghp_[A-Za-z0-9]|npm_[A-Za-z0-9]|xox[bp]-|-----BEGIN|authorization:|x-api-key)/i.test(stdout), "activation output contains no secrets");
   const { stdout: js } = await run([ENDPOINT, "--json", "--no-color"]);
@@ -109,6 +115,10 @@ assert.equal((await run(["gold-rush", "report", "pkg_fixture_1", "--endpoint", E
   assert.ok(j.activation, "--json output has activation object");
   assert.equal(j.activation.baseline_url, "https://live-vps.sasame.online/observatory/check/");
   assert.equal(j.activation.pricing_url, "https://srl-sasame.com/pricing");
+  assert.equal(j.activation.beta_url, "https://srl-sasame.com/start");
+  assert.equal(j.activation.beta_name, "Capability Control Beta");
+  assert.equal(j.activation.beta_access, "free");
+  assert.equal(j.activation.payment_method_required, false);
 }
 
 // 8. no token/secret leakage

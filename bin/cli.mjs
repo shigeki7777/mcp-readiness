@@ -6,15 +6,18 @@ import { runGoldRush, renderGoldRush, DEFAULT_ENDPOINT } from "../src/gold-rush.
 const OBSERVATORY = "https://live-vps.sasame.online/public-mcp";
 const REPO = "https://github.com/shigeki7777/mcp-readiness";
 const CLAIM = "https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml";
+const START = "https://srl-sasame.com/start";
 // Activation: a server can be DISCOVERED (crawled) without ever being CALLED.
-// baseline = free, hosted, measurement-only. There is no live paid mechanical
-// "activation repair" SKU as of 2026-08-13 (the old $99 Stripe link and price
-// pointed at a retired product; the closest current SKU, Assisted Review, is
-// EUR 99 one-time but price_state=APPROVED_NOT_LIVE — not purchasable). Current
-// prices/availability are always read from pricing_url, never hard-coded here.
+// The current new-user handoff is Capability Control Beta: free during beta and
+// no payment method required. Keep the historical pricing URL in machine output
+// for compatibility, but never infer current purchasability from this CLI.
 const ACTIVATION = {
   baseline_url: "https://live-vps.sasame.online/observatory/check/",
   pricing_url: "https://srl-sasame.com/pricing",
+  beta_url: START,
+  beta_name: "Capability Control Beta",
+  beta_access: "free",
+  payment_method_required: false,
 };
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
@@ -44,12 +47,16 @@ ${bold("What it checks")} (10 criteria, A>=10 · B>=8 · C>=5 · D below)
   C8 machine identity   C9 token efficiency   C10 honest errors
   + advisory Claude/ChatGPT directory pre-flight
 
-${bold("Gold Rush v1 handoff")} (drives SaSame's public MCP — measurement only, no payment, no key)
+${bold("SaSame free beta handoff")}
+  ${START}
+  Current new-user path: Capability Control Beta — free during beta, no payment method required.
+
+${bold("Legacy compatibility — Gold Rush v1")} (measurement only, no payment, no key)
   npx mcp-readiness gold-rush start <mcp-url> [--goal <preset>]   # create/identify a package
   npx mcp-readiness gold-rush status <package-id>                 # read append-only package state
   npx mcp-readiness gold-rush run <package-id>                    # advance one deterministic safe step
   npx mcp-readiness gold-rush report <package-id>                 # produce the Visibility Report
-  (add --json for machine output · --endpoint <url> to target another SaSame public MCP)
+  (kept for existing scripts; add --json for machine output · --endpoint <url> to target another SaSame public MCP)
 
 ${bold("Exit codes")}  0 = grade A/B (or gold-rush ok) · 1 = grade C/D incl. unreachable-D (or tool error) · 2 = usage error
 ${bold("Flags")}  --json machine-readable · --no-color plain output
@@ -145,7 +152,9 @@ const ok = (b) => (b ? C("32", "PASS") : C("31", "FAIL"));
   console.log(`  ${bold("Agents may DISCOVER this server without ever CALLING its tools.")}`);
   console.log(`  Free activation baseline ${dim("(observed discovery vs. real tool calls)")}:`);
   console.log(`    ${ACTIVATION.baseline_url}  ${dim("(find your server, or ask via /public-mcp start_here)")}`);
-  console.log(`  ${dim("No paid activation-repair SKU is currently sold. Current Factory plans/prices:")}`);
+  console.log(`  ${bold("Continue with SaSame")}  Capability Control Beta is the current new-user path:`);
+  console.log(`    ${ACTIVATION.beta_url}  ${dim("(free during beta · no payment method required)")}`);
+  console.log(`  ${dim("Plan records and current availability remain published at:")}`);
   console.log(`    ${ACTIVATION.pricing_url}`);
   console.log("");
   console.log(`  ${dim("Think a check is wrong or unfair to your server? We'd genuinely like to be")}`);

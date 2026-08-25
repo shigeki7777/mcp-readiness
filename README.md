@@ -18,11 +18,11 @@ Zero dependencies. Zero config. Zero telemetry. Runs anywhere Node 18+ runs.
 > [open an issue](https://github.com/shigeki7777/mcp-readiness/issues) — that is how this got fixed.
 
 > **Part of [SaSame MCP Factory](https://srl-sasame.com).** This CLI is the forkable, local twin of the
-> Factory's own inspection engine — the same 10 criteria the hosted [SaSame MCP
+> Factory's inspection engine — the same 10 criteria the hosted [SaSame MCP
 > Observatory](https://github.com/shigeki7777/sasame-mcp-observatory) uses to continuously inspect and
-> observe MCP servers as they move through the Factory (idea → build → ship → distribute → observe →
-> repair). Run it standalone, or use the grade as the entry point into the Factory's public
-> [MCP server](https://github.com/shigeki7777/sasame-mcp-observatory) and [Gold Rush Town](https://github.com/shigeki7777/gold-rush-town) stations.
+> observe MCP servers. Run it standalone, then continue through the current free **Capability Control
+> Beta** at <https://srl-sasame.com/start>. Historical Gold Rush commands remain available only for
+> compatibility with existing scripts.
 
 ```bash
 npx mcp-readiness https://mcp.example.com/mcp
@@ -105,9 +105,11 @@ grades **D**, and exits **1**. Exit code 2 fires only for usage errors (e.g. no 
 npx mcp-readiness <url> --json          # machine-readable full report
 ```
 
-## After the grade: claim the Passport
+## After the grade: continue in SaSame free beta
 
-`mcp-readiness` is the local, reproducible check. The hosted SaSame MCP Observatory adds the public record: an owner-controlled Readiness Passport, signed certificates, badge snippets, and grade-over-time history.
+`mcp-readiness` is the local, reproducible check. The current new-user path in SaSame is **Capability Control Beta**: start at <https://srl-sasame.com/start>, sign in, connect an AI, choose the capabilities it may use, and run bounded work. **It is free during the current beta and requires no payment method.**
+
+The hosted SaSame MCP Observatory remains the public measurement/ownership record:
 
 - If the endpoint is yours: claim it free with `claim_start(url)` → `claim_confirm` on `https://live-vps.sasame.online/public-mcp`.
 - If you prefer GitHub: open the claim template at `https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml`.
@@ -118,23 +120,22 @@ npx mcp-readiness <url> --json          # machine-readable full report
 A good grade means agents *can* call your server — not that they *do*. Crawlers and directories
 may DISCOVER a server (fetch its `tools/list`) without any agent ever CALLING its tools.
 
-- **Free — activation baseline.** The hosted Observatory publishes what it has actually observed:
+- **Free activation baseline.** The hosted Observatory publishes what it has actually observed:
   discovery events vs. real tool calls. Find your server at
   <https://live-vps.sasame.online/observatory/check/>, or connect the SaSame public MCP
   (`https://live-vps.sasame.online/public-mcp`) and call `start_here()` for the guided baseline.
   Measurement only — the numbers can be zero, and a baseline is not an endorsement or a promise
   of traffic.
-- **Paid activation repair is not currently sold.** There is no live SKU for mechanical
-  activation repair today. Current SaSame Factory plans (Free Listing, Factory, Factory Pro,
-  Factory Team, Assisted Review) and their live purchasability (`price_state`) are always at
-  <https://srl-sasame.com/pricing> — check there rather than assuming anything below is still
-  accurate; this README does not hard-code prices.
+- **Current new-user handoff.** Capability Control Beta is the active acquisition path at
+  <https://srl-sasame.com/start>. New users do not need a payment method during the beta. Historical
+  plan records and their current availability remain visible at <https://srl-sasame.com/pricing>;
+  this CLI does not infer purchasability from old plan names or prices.
 - **Boundary:** measurement, not endorsement. No adoption guarantees — the evidence shows what
   changed in observed external calls, not a promised outcome.
 
-## Gold Rush v1 handoff (optional)
+## Legacy Gold Rush v1 compatibility (optional)
 
-Beyond the local grade, `mcp-readiness` can drive SaSame's **Gold Rush Agent Package** over the public MCP — one guided journey that records what happened to an MCP: a package record, a visibility baseline, a runtime-health snapshot, a Visibility Report, and a replayable receipt. *Directories list MCPs. Gold Rush records what happened to them.*
+The `gold-rush` subcommands remain available so existing scripts do not break. They are a **legacy compatibility surface**, not SaSame's current product identity or primary new-user path. They still drive the historical measurement/package flow over the public MCP and keep the same no-payment, no-key boundaries.
 
 ```bash
 npx mcp-readiness gold-rush start  https://mcp.example.com/mcp    # create/identify a package -> package_id
@@ -146,10 +147,10 @@ npx mcp-readiness gold-rush report <package-id>                   # produce the 
 - Add `--json` for machine output, `--goal <preset>` on `start` (e.g. `quick_claim`, `visibility_check`), or `--endpoint <url>` to target another SaSame public MCP.
 - No API key. The public surface is free and needs no token; this CLI sends no credentials.
 - **Boundaries (non-negotiable):** measurement record, **not** endorsement · claim status, **not** identity/KYC verification · runtime health, **not** a security verdict · receipt, **not** a fiscal invoice or payment guarantee.
-- **No payment:** these commands never trigger live settlement, DNS changes, wallet publication, external account creation, legal, or KYC actions.
+- **No payment:** these compatibility commands never trigger live settlement, DNS changes, wallet publication, external account creation, legal, or KYC actions.
 - Methodology (what is / is not measured): <https://live-vps.sasame.online/observatory/methodology.html>
 
-The existing `npx mcp-readiness <url>` audit works exactly as before — Gold Rush mode is purely additive.
+The existing `npx mcp-readiness <url>` audit works exactly as before. The primary SaSame handoff is now <https://srl-sasame.com/start>; Gold Rush remains compatibility-only.
 
 ## The 10 criteria
 

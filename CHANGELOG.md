@@ -2,6 +2,16 @@
 
 All notable changes to `mcp-readiness`.
 
+## 0.6.1 — 2026-08-25
+
+### Changed — hand off to the current free Capability Control Beta
+
+- The primary post-audit handoff now points to `https://srl-sasame.com/start`, the current SaSame Capability Control Beta entry path.
+- The CLI and README state the current beta access boundary directly: free during beta and no payment method required for new users.
+- Existing `gold-rush start|status|run|report` commands are preserved unchanged for compatibility, but are now explicitly labeled legacy instead of being presented as SaSame's current product path.
+- `--json` keeps the existing `activation.baseline_url` and `activation.pricing_url` fields and adds non-breaking beta metadata (`beta_url`, `beta_name`, `beta_access`, `payment_method_required`).
+- The 10 readiness criteria, grade thresholds, audit transport behavior, exit codes, and Gold Rush command mechanics are unchanged.
+
 ## 0.6.0 — 2026-08-13
 
 ### Changed — removed the stale $99 "activation repair" Stripe link (breaking JSON field)
