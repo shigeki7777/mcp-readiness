@@ -42,7 +42,7 @@ ${bold("Example")}
   npx mcp-readiness http://localhost:3000/mcp        # audit your local server while developing
 
 ${bold("What it checks")} (10 criteria, A>=10 · B>=8 · C>=5 · D below)
-  C1 handshake   C2 tool listability   C3 tool validity   C4 description quality
+  C1 protocol entry   C2 tool listability   C3 tool validity   C4 description quality
   C5 safety annotations   C6 liveness   C7 returns real content (anti-ghost)
   C8 machine identity   C9 token efficiency   C10 honest errors
   + advisory Claude/ChatGPT directory pre-flight

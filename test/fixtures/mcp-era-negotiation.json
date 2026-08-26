@@ -1,0 +1,183 @@
+{
+  "modern_only": {
+    "discover": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "resultType": "complete",
+        "supportedVersions": ["2026-07-28"],
+        "capabilities": {
+          "tools": {},
+          "extensions": {
+            "io.modelcontextprotocol/apps": {},
+            "io.modelcontextprotocol/tasks": {}
+          }
+        },
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "modern-only",
+            "version": "1.0.0"
+          }
+        }
+      }
+    }
+  },
+  "legacy_only": {
+    "discover": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "error": {
+        "code": -32601,
+        "message": "Method not found"
+      }
+    },
+    "initialize": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {},
+        "serverInfo": {
+          "name": "legacy-only",
+          "version": "1.0.0"
+        }
+      }
+    },
+    "session_id": "fixture-session-1"
+  },
+  "dual_stack": {
+    "discover": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "resultType": "complete",
+        "supportedVersions": ["2026-07-28", "2025-11-25"],
+        "capabilities": {
+          "tools": {}
+        }
+      }
+    }
+  },
+  "malformed_discovery": {
+    "discover": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "resultType": "complete",
+        "supportedVersions": "2026-07-28",
+        "capabilities": {}
+      }
+    },
+    "initialize": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {},
+        "serverInfo": {
+          "name": "malformed-dual-stack",
+          "version": "1.0.0"
+        }
+      }
+    }
+  },
+  "unsupported_revision": {
+    "discover": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "resultType": "complete",
+        "supportedVersions": ["2027-01-01"],
+        "capabilities": {}
+      }
+    },
+    "initialize": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {},
+        "serverInfo": {
+          "name": "future-plus-legacy",
+          "version": "1.0.0"
+        }
+      }
+    }
+  },
+  "corrective_revision": {
+    "unsupported": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "error": {
+        "code": -32022,
+        "message": "Unsupported protocol version",
+        "data": {
+          "requested": "2027-01-01",
+          "supported": ["2026-07-28"]
+        }
+      }
+    },
+    "discover": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "result": {
+        "resultType": "complete",
+        "supportedVersions": ["2026-07-28"],
+        "capabilities": {
+          "tools": {}
+        }
+      }
+    }
+  },
+  "deepwiki_like": {
+    "discover": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "error": {
+        "code": -32600,
+        "message": "Invalid Request"
+      }
+    },
+    "discover_http_status": 400,
+    "initialize": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {},
+        "serverInfo": {
+          "name": "deepwiki-like",
+          "version": "1.0.0"
+        }
+      }
+    }
+  },
+  "genuine_invalid_request": {
+    "discover": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "error": {
+        "code": -32603,
+        "message": "Internal server error while validating request payload size"
+      }
+    },
+    "discover_http_status": 400
+  },
+  "stateful_legacy": {
+    "negotiated": {
+      "kind": "legacy",
+      "revision": "2025-11-25",
+      "entry_method": "initialize",
+      "session_model": "stateful",
+      "session_id": "fixture-session-1"
+    }
+  },
+  "sessionless_modern": {
+    "negotiated": {
+      "kind": "modern",
+      "revision": "2026-07-28",
+      "entry_method": "server/discover",
+      "session_model": "request_scoped"
+    }
+  }
+}
