@@ -59,7 +59,7 @@ A real run — a strong server that's **one fix from a clean directory pre-fligh
   MCP Readiness    B    9/10 criteria  ·  11 tools  ·  134ms
   https://mcp.example.com/mcp
 
-  PASS  C1 Protocol handshake conformance
+  PASS  C1 Protocol entry conformance
   PASS  C2 Tool listability
   PASS  C3 Tool object validity
   PASS  C4 Description sufficiency / selectability
@@ -154,27 +154,38 @@ The existing `npx mcp-readiness <url>` audit works exactly as before. The primar
 
 ## The 10 criteria
 
-Standard: `agent-tool-discoverability-standard/0.3` (the `--json` output embeds it as `standard_version`).
+Standard: `agent-tool-discoverability-standard/0.4` (the `--json` output embeds it as `standard_version`).
 Each criterion is bound to the MCP spec or a direct measurement — not taste. Grade: **A** =10 · **B** 8–9 · **C** 5–7 · **D** below. (A server that never returns verifiable content is capped at **B** — honesty cap.)
 
 | | Criterion | Bound to |
 |---|---|---|
-| C1 | Protocol handshake conformance | `initialize` returns `protocolVersion` + `capabilities` |
+| C1 | Protocol entry conformance | modern `server/discover`, with revision-aware fallback to legacy `initialize` — either returning `protocolVersion`/`supportedVersions` + `capabilities` |
 | C2 | Tool listability | `tools/list` returns `result.tools[]` |
 | C3 | Tool object validity | valid name + non-empty description + object `inputSchema` (a bare `{}` — valid JSON Schema for no-arg tools — is accepted; missing/null is rejected) |
 | C4 | Description sufficiency | every desc ≥12 chars, median ≥20, ≥60% distinct |
 | C5 | Safety annotation presence | a boolean hint (`readOnlyHint`/`destructiveHint`/…) on ≥50% of tools |
-| C6 | Liveness & latency | 2xx `initialize` < 5000 ms |
+| C6 | Liveness & latency | successful revision-appropriate protocol entry < 5000 ms |
 | C7 | Returns real content (anti-ghost) | a read-only tool returns substantive, non-echo content; priced/x402 → UNVERIFIED |
 | C8 | Machine-discoverable identity | `serverInfo` name + version |
 | C9 | Token efficiency | decoded `tools/list` result payload < 40 KB |
 | C10 | Honest error behavior | unknown method → structured JSON-RPC error, not a hang |
 
-Measurement semantics (v0.3): `initialize` and `tools/list` get **one retry after ~800 ms** on a
-network-layer failure or timeout only — never on an HTTP error status (a 401/500 is a real
-measurement). All post-`initialize` calls echo the server's negotiated `protocolVersion` in the
-`mcp-protocol-version` header (falling back to the pinned spec version if the server omits it). A
-hang on the unknown-method probe fails only C10.
+Measurement semantics (v0.4): protocol entry tries the modern `server/discover` method first
+(`--json` reports which one actually answered as `entry_method`, plus `protocol_revision` and
+`session_model`); a server that doesn't implement it — or answers with a DeepWiki-like 400/-32600
+"Invalid Request" carrying no structured revision advice — falls back to legacy `initialize`, which
+itself walks a bounded real-world ladder of older MCP revisions (unchanged since 0.5.0) for servers
+that reject even the current legacy pin. Protocol entry and `tools/list` get **one retry after ~800
+ms** on a network-layer failure or timeout only — never on an HTTP error status (a 401/500 is a real
+measurement). All post-entry calls carry the negotiated `protocolVersion` (and, for a stateful legacy
+session, the negotiated session id). A hang on the unknown-method probe fails only C10.
+
+`--json` also reports which protocol era was actually negotiated: `entry_method` (`server/discover` or
+`initialize`), `protocol_revision`, `session_model` (`request_scoped` for modern; `stateful` or
+`stateless_legacy` for legacy, depending on whether `initialize` actually issued a session id), and
+`extensions` (modern protocol extension keys the server declared, `[]` otherwise). A compliant server
+that speaks only the modern `server/discover` entry — with no `initialize` at all — can be graded since
+0.7.0; earlier versions only ever attempted `initialize`.
 
 It also runs an **advisory directory pre-flight** mapping to documented mechanical reject reasons for
 the Claude Connectors and ChatGPT Apps directories (missing titles/annotations, promotional or generic

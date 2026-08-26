@@ -3,21 +3,43 @@
 // Ported from the SaSame MCP Observatory's canonical engine so a local audit reproduces
 // the same per-criterion grade you'd get from the hosted Observatory. No signing, no keys,
 // no telemetry — plain `fetch` to the target you name. Node >= 18 (built-in fetch/AbortSignal).
+import { negotiateMcpEra, followupRequestContext } from "./mcp-era-negotiation.mjs";
 
-const SPEC = { mcp: "2025-11-25", registry_schema: "2025-12-11" };
-export const STANDARD_VERSION = "agent-tool-discoverability-standard/0.3";
-const PINNED_PROTOCOL = SPEC.mcp; // client-advertised MCP protocol version (fallback if server omits one)
+const SPEC = { mcp: "2026-07-28", legacy_fallback: "2025-11-25", registry_schema: "2025-12-11" };
+export const STANDARD_VERSION = "agent-tool-discoverability-standard/0.4";
+const PINNED_PROTOCOL = SPEC.legacy_fallback; // legacy-only fallback for callers without an explicit revision
+
+// Mirrors the canonical Observatory engine's own modern routing-header requirement: a request whose
+// body carries the modern _meta.protocolVersion envelope (server/discover, and any post-negotiation
+// call after a modern entry) must also carry Mcp-Method (and Mcp-Name for these three methods) or a
+// server implementing that convention rejects with JSON-RPC -32020 "Header mismatch". Discovered by
+// running this exact CLI, from a clean install, against SaSame's own production public-mcp server
+// (https://live-vps.sasame.online/public-mcp) — the modern entry hard-failed there until this was
+// added. Sending these two headers unconditionally is harmless against every other server: a request
+// without the modern envelope is never checked against them.
+const MODERN_NAMED_METHODS = new Set(["tools/call", "prompts/get", "resources/read"]);
 
 // ── transport: one MCP JSON-RPC call over streamable-http (SSE or plain JSON), session-aware ──
-async function mcp(url, method, params, sessionId, isNotification, { timeoutMs = 9000, protocolVersion } = {}) {
+async function mcp(url, method, params, sessionId, isNotification, { timeoutMs = 9000, protocolVersion, requestMeta } = {}) {
   const h = {
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
-    "user-agent": "mcp-audit/0.1",
+    "user-agent": "mcp-audit/0.2",
     "mcp-protocol-version": protocolVersion || PINNED_PROTOCOL,
   };
   if (sessionId) h["mcp-session-id"] = sessionId; // forward session for STATEFUL servers (else tools/list 400s)
-  const msg = { jsonrpc: "2.0", method, params: params || {} };
+  h["mcp-method"] = method;
+  if (MODERN_NAMED_METHODS.has(method)) {
+    const name = params && (params.name ?? params.uri);
+    if (typeof name === "string" && name) h["mcp-name"] = name;
+  }
+  // Post-negotiation calls after a MODERN entry repeat the per-request _meta envelope (there is no
+  // session to carry it instead) — mirrors the canonical engine's own follow-up request shape.
+  const msg = {
+    jsonrpc: "2.0",
+    method,
+    params: requestMeta ? { ...(params || {}), _meta: { ...((params || {})._meta || {}), ...requestMeta } } : (params || {}),
+  };
   if (!isNotification) msg.id = 1;
   let r, rawBody = "";
   try {
@@ -53,12 +75,12 @@ async function mcpWithRetry(url, method, params, sessionId, isNotification, opts
 
 // ── the standard: 10 criteria, each bound to spec / measurement (not taste) ──
 export const STANDARD = [
-  { id: "C1", name: "Protocol handshake conformance", from: "MCP spec " + SPEC.mcp + " — JSON-RPC 2.0 initialize MUST return protocolVersion + capabilities" },
+  { id: "C1", name: "Protocol entry conformance", from: "MCP " + SPEC.mcp + " server/discover, with revision-aware fallback to legacy initialize" },
   { id: "C2", name: "Tool listability", from: "MCP spec /server/tools — tools/list MUST return result.tools[]" },
   { id: "C3", name: "Tool object validity", from: "valid name + non-empty description + an object inputSchema (type:object, declared properties, OR a bare {} = a valid JSON Schema 'accepts anything' for no-arg tools; missing/null inputSchema rejected)" },
   { id: "C4", name: "Description sufficiency / selectability", from: "every description >=12 chars, median >=20, distinctness ratio >=0.6 (templated/duplicate descriptions are unselectable)" },
   { id: "C5", name: "Safety annotation presence", from: "MCP ToolAnnotations — a valid boolean hint (readOnly/destructive/idempotent/openWorld) on >=50% of tools" },
-  { id: "C6", name: "Liveness & latency", from: "2xx initialize within <5000ms" },
+  { id: "C6", name: "Liveness & latency", from: "successful revision-appropriate protocol entry within <5000ms" },
   { id: "C7", name: "Returns real content (anti-ghost)", from: "a SAFE (read-only) tool returns substantive MCP content[] (non-echo); priced/x402 -> UNVERIFIED" },
   { id: "C8", name: "Machine-discoverable identity", from: "Official MCP Registry server.json " + SPEC.registry_schema + " — name/version self-description (serverInfo)" },
   { id: "C9", name: "Token efficiency", from: "DECODED tools/list result payload bytes (Buffer.byteLength(JSON.stringify(result))) < 40000 (token-bloat is a known ecosystem failure)" },
@@ -92,76 +114,69 @@ function directoryPreflight(tools, init) {
   return out;
 }
 
-// ── REVISION-AWARE HANDSHAKE ──────────────────────────────────────────────────
-// PINNED_PROTOCOL is our best guess, not every server's reality. Servers that validate the
-// MCP-Protocol-Version header before routing reject an unknown revision outright — and many of them
-// helpfully name what they DO support in error.data.supported, e.g.
-//   {"code":-32600,"message":"Unsupported MCP-Protocol-Version",
-//    "data":{"supported":["2024-11-05","2025-03-26","2025-06-18"],"requested":"2025-11-25"}}
-// Before 0.5.0 we sent one initialize at PINNED_PROTOCOL and gave up, so any server speaking only
-// pre-2025-11-25 revisions (most of the deployed ecosystem) failed C1, never reached tools/list, and
-// cascade-failed to a FALSE grade D with "0 tools". Now: honour the advertised list when the server
-// offers one, otherwise walk a real-world ladder. Bounded to 3 attempts so an uncooperative server
-// cannot stretch the audit's latency budget.
-export const LEGACY_FALLBACK_LADDER = ["2025-06-18", "2025-03-26", "2024-11-05"];
+// ── DUAL-STACK PROTOCOL ENTRY (era-negotiation) ────────────────────────────────
+// #3597 fixed a DeepWiki-like false negative in the canonical SaSame engine: a modern
+// `server/discover` call answering HTTP 400 / JSON-RPC -32600 "Invalid Request" (no structured
+// `data.supported` list) was treated as a hard failure and legacy `initialize` was never attempted.
+//
+// #3607 (independent-audit follow-up): an earlier revision of this CLI vendored a HAND-WRITTEN
+// reimplementation of the canonical decision tree, verified only against the canonical module's own
+// (non-exhaustive) test suite — and it silently drifted from canonical on branches that suite never
+// exercised. The canonical module (packages/capability-runtime/src/lib/mcp-era-negotiation.mjs) has
+// ZERO external imports, so this package now vendors it BYTE-FOR-BYTE instead (see
+// ./mcp-era-negotiation.mjs — untouched, and test/canonical-parity-guard.test.mjs, which fails the
+// moment the two files diverge by even one byte). This also means the bounded legacy-revision ladder
+// (LEGACY_FALLBACK_LADDER) now lives INSIDE negotiateMcpEra itself: it calls exchange() up to 3 times
+// for "initialize" — DEFAULT_LEGACY_PROTOCOL_REVISION first, then whatever the server advises, then
+// the hardcoded ladder — so this CLI's transport glue (auditExchange, below) no longer implements any
+// ladder logic of its own; it is one generic per-attempt HTTP call, exactly matching negotiateMcpEra's
+// exchange(request, context) contract, whether the method is "server/discover" or "initialize".
+export { LEGACY_FALLBACK_LADDER } from "./mcp-era-negotiation.mjs";
 
-function advisedRevisions(res) {
-  const d = res && res.json && res.json.error && res.json.error.data;
-  const list = d && (d.supported || d.supportedVersions);
-  return Array.isArray(list) ? list.filter((v) => typeof v === "string" && v.length > 0) : [];
-}
-
-function initializeOk(res) {
-  return !!(res && res.json && res.json.result && res.json.result.protocolVersion && res.json.result.capabilities);
-}
-
-async function initializeWithRevisionFallback(url) {
-  const candidates = [PINNED_PROTOCOL];
-  let res = null;
-  for (let i = 0; i < candidates.length && i < 3; i += 1) {
-    const revision = candidates[i];
-    res = await mcpWithRetry(url, "initialize", {
-      protocolVersion: revision,
-      capabilities: {},
-      clientInfo: { name: "mcp-audit", version: "0.1" },
-    }, null, false, { protocolVersion: revision });
-    res.offered_revision = revision;
-    res.revision_attempts = candidates.slice(0, i + 1);
-    if (initializeOk(res)) return res;
-    // Only a structured JSON-RPC rejection tells us anything about revisions. A network failure or an
-    // opaque 5xx is a real measurement of "unreachable/broken" — do not paper over it with retries.
-    const next = advisedRevisions(res).slice().sort().reverse()
-      .concat(LEGACY_FALLBACK_LADDER)
-      .find((v) => !candidates.includes(v));
-    if (!next) break;
-    candidates.push(next);
+function throwOnTransportFailure(res) {
+  if (res.status === 0) throw Object.assign(new Error(res.fetchError || "network_error"), {});
+  if (res.status === 401 || res.status === 403 || res.status >= 500) {
+    throw Object.assign(new Error("mcp_http_" + res.status), { status: res.status });
   }
-  return res;
+}
+
+function auditExchange(url, trace) {
+  return async function exchange(request, context) {
+    const res = await mcpWithRetry(url, request.method, request.params, null, false, { protocolVersion: context.revision });
+    trace.lastEntry = res;
+    throwOnTransportFailure(res);
+    return { response: res.json, sessionId: res.sessionId, status: res.status };
+  };
 }
 
 export async function auditServer(url) {
-  const init = await initializeWithRevisionFallback(url);
-  const latency_ms = init.latency_ms;
-  const sid = init.sessionId;
-  // NEGOTIATED PROTOCOL VERSION: all post-initialize calls carry the protocolVersion the server returned
-  // (fallback: the pinned version if omitted). Per MCP spec a client sending an unsupported version header
-  // gets 400 on post-init calls — strict spec-compliant servers were false-negatived before this.
-  const proto = (init.json && init.json.result && typeof init.json.result.protocolVersion === "string" && init.json.result.protocolVersion) || PINNED_PROTOCOL;
-  const postOpts = { protocolVersion: proto };
-  try { await mcp(url, "notifications/initialized", {}, sid, true, postOpts); } catch (_) {}
+  const clientInfo = { name: "mcp-audit", version: "0.2" };
+  const trace = { lastEntry: { status: 0, json: null, raw: "", sessionId: null, latency_ms: 0 } };
+  const exchange = auditExchange(url, trace);
+  const negotiated = await negotiateMcpEra({ clientInfo, exchange });
+  const entryOk = negotiated.kind === "modern" || negotiated.kind === "legacy";
+  const entry = trace.lastEntry;
+  const latency_ms = entry.latency_ms;
+  const sid = negotiated.kind === "legacy" ? negotiated.session_id : null;
+  const requestContext = entryOk
+    ? followupRequestContext(negotiated, { clientInfo })
+    : { revision: negotiated.revision || SPEC.mcp, headers: {}, meta: null };
+  const postOpts = { protocolVersion: requestContext.revision, requestMeta: requestContext.meta };
+  if (negotiated.kind === "legacy") {
+    try { await mcp(url, "notifications/initialized", {}, sid, true, postOpts); } catch (_) {}
+  }
   const tl = await mcpWithRetry(url, "tools/list", {}, sid, false, postOpts);
   const ev = {}, c = {};
 
-  const initOk = initializeOk(init);
-  const tried = Array.isArray(init.revision_attempts) && init.revision_attempts.length > 1
-    ? " (offered " + init.revision_attempts.join(" -> ") + ")"
+  // negotiateMcpEra reports the actual legacy-revision ladder it walked internally (present whenever
+  // entry_method === "initialize", success or failure) — no separate CLI-side tracking needed.
+  const offeredNote = negotiated.entry_method === "initialize" && Array.isArray(negotiated.legacy_attempts) && negotiated.legacy_attempts.length > 1
+    ? " (offered " + negotiated.legacy_attempts.join(" -> ") + ")"
     : "";
-  c.C1 = initOk;
-  ev.C1 = initOk
-    ? "initialize negotiated " + proto + tried + "; result keys: " + Object.keys(init.json.result).join(",")
-    : "initialize failed" + tried + ": " + (init.json && init.json.error
-        ? "JSON-RPC " + init.json.error.code + " " + String(init.json.error.message || "").slice(0, 80)
-        : "(no result, status " + init.status + (init.fetchError ? ", " + init.fetchError : "") + ")");
+  c.C1 = entryOk;
+  ev.C1 = entryOk
+    ? negotiated.entry_method + " negotiated " + negotiated.revision + offeredNote + " (" + negotiated.session_model + ")"
+    : "protocol entry failed: " + (negotiated.reason || negotiated.kind) + " (status " + entry.status + (entry.fetchError ? ", " + entry.fetchError : "") + ")";
 
   const tools = (tl.json && tl.json.result && Array.isArray(tl.json.result.tools)) ? tl.json.result.tools : null;
   c.C2 = !!tools; ev.C2 = tools ? (tools.length + " tools") : "no result.tools[] (status " + tl.status + ")";
@@ -209,7 +224,7 @@ export async function auditServer(url) {
   c.C5 = !!(tools && tools.length && (annValid / tools.length) >= 0.5);
   ev.C5 = tools ? (annValid + "/" + tools.length + " tools carry a valid safety-hint annotation") : "n/a";
 
-  c.C6 = (init.status >= 200 && init.status < 300) && latency_ms < 5000; ev.C6 = "init status " + init.status + ", latency " + latency_ms + "ms (bar: 2xx & <5000ms)";
+  c.C6 = entryOk && latency_ms < 5000; ev.C6 = "entry status " + entry.status + ", latency " + latency_ms + "ms (bar: negotiated & <5000ms)";
 
   // C7 returns real content (anti-ghost). Safety-first: only invoke read-only tools; empty args first, then
   // minimal valid args on a required-arg signal; multi-tool sample (pass if ANY read-only tool is substantive).
@@ -293,7 +308,7 @@ export async function auditServer(url) {
   }
   c.C7 = realContent; ev.C7 = deliveryNote;
 
-  const si = init.json && init.json.result && init.json.result.serverInfo;
+  const si = negotiated.server_info;
   c.C8 = !!(si && String(si.name || "").trim() && String(si.version || "").trim()); ev.C8 = si ? ("serverInfo: " + si.name + " " + (si.version || "(no version)")) : "no serverInfo";
 
   // C9 token efficiency (v0.3): measure the DECODED JSON result payload of tools/list — the raw SSE-framed
@@ -313,6 +328,7 @@ export async function auditServer(url) {
   const grade = gradeFrom(passes, !realContent);
   const criteria = STANDARD.map((s) => ({ id: s.id, name: s.name, pass: c[s.id] === true, evidence: ev[s.id], derived_from: s.from }));
   const fails = criteria.filter((x) => !x.pass);
+  const initShim = { json: { result: { serverInfo: si || null, instructions: (entry.json && entry.json.result && entry.json.result.instructions) || null } } };
   return {
     subject: url, audited_at: new Date().toISOString(), latency_ms, tool_count: tools ? tools.length : 0,
     passes, total: STANDARD.length, grade,
@@ -320,6 +336,12 @@ export async function auditServer(url) {
     honesty_cap: !realContent ? (c7DeclinedNoRo ? "content verification declined (no readOnlyHint tool to safely probe) -> grade capped at B" : "no verified real content -> grade capped at B") : null,
     delivery: deliveryNote, criteria,
     top_gap: fails.length ? (fails[0].id + " " + fails[0].name + " — " + fails[0].evidence) : "none (passes all checks)",
-    preflight: directoryPreflight(tools, init),
+    // Additive (non-breaking) since 0.4/0.7: mirrors the canonical dual-stack engine's own fields —
+    // which protocol era/method this audit actually negotiated (see #3597 era-negotiation fix above).
+    protocol_revision: negotiated.revision || null,
+    entry_method: negotiated.entry_method || null,
+    session_model: negotiated.session_model || "unknown",
+    extensions: negotiated.extensions || [],
+    preflight: directoryPreflight(tools, initShim),
   };
 }
