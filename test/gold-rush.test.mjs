@@ -31,9 +31,9 @@ const server = createServer(async (req, res) => {
       if (a.package_id === "pkg_missing") return wrap({ ok: false, package_id: a.package_id, error: "no such package" });
       return wrap({ ok: true, package_id: a.package_id, stage_label: "report_ready", done: true, next_action: { tool: "gold_rush_report", args: { package_id: a.package_id } }, measurement_boundary: "…", no_payment_boundary: "…", known_limitations: ["latest snapshot only"] });
     }
-    if (name === "gold_rush_agent_run") return wrap({ ok: true, package_id: a.package_id, step_run: "observe", stage_label: "observed", done: false, next_action: { tool: "gold_rush_agent_run", args: { package_id: a.package_id } }, measurement_boundary: "…", no_payment_boundary: "…", known_limitations: [] });
+    if (name === "gold_rush_agent_run") return wrap({ ok: true, package_id: a.package_id, step_run: "observe", stage_label: "observed", done: false, next_action: { tool: "gold_rush_agent_run", args: { package_id: a.package_id }, does: "observe" }, measurement_boundary: "…", no_payment_boundary: "…", known_limitations: [] });
     if (name === "gold_rush_report") return wrap({ ok: true, package_id: a.package_id, stage_label: "report_ready", done: true, report: { runtime_health: { mcp_reachable: true, tool_count: 1, schema_parseable: true }, tool_readability: { with_description: 1, tool_count: 1, description_coverage_pct: 100 }, receipts: { receipt_id: "grr_fixture" }, known_limitations: ["not a security verdict"], measurement_boundary: "…", no_payment_boundary: "…" }, measurement_boundary: "…", no_payment_boundary: "…", known_limitations: [] });
-    return wrap({ ok: true }); // audit C7 anti-ghost call etc.
+    return wrap({ ok: true });
   }
   res.writeHead(200, { "content-type": "application/json" });
   res.end(JSON.stringify({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "Method not found" } }));
@@ -54,12 +54,14 @@ function run(cliArgs, env = {}) {
   });
 }
 
-// 1. help leads with current free beta and preserves legacy Gold Rush commands
+// 1. help leads with GEC and preserves legacy Gold Rush commands
 {
   const { stdout } = await run(["--help"]);
-  assert.ok(stdout.includes("SaSame free beta handoff"), "help exposes the current SaSame handoff");
-  assert.ok(stdout.includes("https://srl-sasame.com/start"), "help points to the current /start path");
-  assert.ok(stdout.includes("free during beta, no payment method required"), "help states the current beta access boundary");
+  assert.ok(stdout.includes("SaSame GEC handoff"), "help exposes the current SaSame handoff");
+  assert.ok(stdout.includes("https://sasame.online/gec"), "help points to the canonical GEC path");
+  assert.ok(stdout.includes("Projects and OPEN Demands"), "help states the current participation model");
+  assert.ok(!stdout.includes("srl-sasame.com"), "help has no retired company-default domain");
+  assert.ok(!stdout.includes("Capability Control Beta"), "help has no superseded company product handoff");
   assert.ok(stdout.includes("Legacy compatibility — Gold Rush v1"), "Gold Rush is framed as legacy compatibility");
   for (const c of ["gold-rush start", "gold-rush status", "gold-rush run", "gold-rush report"]) assert.ok(stdout.includes(c), `help preserves '${c}'`);
   assert.ok(stdout.includes("measurement only") || stdout.includes("measurement"), "help states measurement boundary");
@@ -98,38 +100,35 @@ assert.equal((await run(["gold-rush", "report", "pkg_fixture_1", "--endpoint", E
   assert.equal(j.subject, ENDPOINT);
 }
 
-// 7. activation/free-beta handoff: appears in text + json output, no secrets
+// 7. activation/GEC handoff: appears in text + json output, no stale company-default identity, no secrets
 {
   const { stdout } = await run([ENDPOINT, "--no-color"]);
   assert.ok(stdout.includes("Agents may DISCOVER this server without ever CALLING its tools."), "activation headline in text output");
-  assert.ok(stdout.includes("Free activation baseline"), "free baseline line present");
+  assert.ok(stdout.includes("Readiness baseline"), "readiness baseline line present");
   assert.ok(stdout.includes("https://live-vps.sasame.online/observatory/check/"), "baseline URL present");
-  assert.ok(stdout.includes("Capability Control Beta is the current new-user path"), "current beta handoff stated");
-  assert.ok(stdout.includes("https://srl-sasame.com/start"), "current /start URL present");
-  assert.ok(stdout.includes("free during beta · no payment method required"), "current beta access boundary stated");
-  assert.ok(stdout.includes("https://srl-sasame.com/pricing"), "pricing URL retained as compatibility/current-availability reference");
-  // no secret material in the printed report (narrow patterns; "Token efficiency" criterion is fine)
+  assert.ok(stdout.includes("Continue with SaSame GEC"), "current GEC handoff stated");
+  assert.ok(stdout.includes("https://sasame.online/gec"), "canonical GEC URL present");
+  assert.ok(stdout.includes("Projects, OPEN Demands, paid work, agent participation, verified outcomes"), "GEC participation paths present");
+  assert.ok(!stdout.includes("srl-sasame.com"), "retired domain absent");
+  assert.ok(!stdout.includes("Capability Control Beta"), "superseded product handoff absent");
   assert.ok(!/(sk_live_|sk_test_|rk_live_|ghp_[A-Za-z0-9]|npm_[A-Za-z0-9]|xox[bp]-|-----BEGIN|authorization:|x-api-key)/i.test(stdout), "activation output contains no secrets");
   const { stdout: js } = await run([ENDPOINT, "--json", "--no-color"]);
   const j = JSON.parse(js);
   assert.ok(j.activation, "--json output has activation object");
   assert.equal(j.activation.baseline_url, "https://live-vps.sasame.online/observatory/check/");
-  assert.equal(j.activation.pricing_url, "https://srl-sasame.com/pricing");
-  assert.equal(j.activation.beta_url, "https://srl-sasame.com/start");
-  assert.equal(j.activation.beta_name, "Capability Control Beta");
-  assert.equal(j.activation.beta_access, "free");
-  assert.equal(j.activation.payment_method_required, false);
+  assert.equal(j.activation.gec_url, "https://sasame.online/gec");
+  assert.equal(j.activation.gec_name, "SaSame Global Ecosystem (GEC)");
+  assert.equal(j.activation.participation, "Projects, OPEN Demands, paid work, agent participation, verified outcomes");
+  assert.equal("pricing_url" in j.activation, false, "superseded pricing handoff removed");
+  assert.equal("beta_url" in j.activation, false, "superseded beta handoff removed");
 }
 
 // 8. no token/secret leakage
 {
   const client = readFileSync(fileURLToPath(new URL("../src/gold-rush.mjs", import.meta.url)), "utf8");
   const both = client + readFileSync(CLI, "utf8");
-  // neither the client nor the CLI reads a secret env var
   assert.ok(!/process\.env\.[A-Za-z_]*(TOKEN|SECRET|APIKEY|API_KEY|BEARER|PASSWORD|NPM|AUTH)/i.test(both), "reads no secret env var");
-  // the client that makes the request has no auth header / bearer / api-key
   assert.ok(!/\bauthorization\b|x-api-key|\bbearer\b/i.test(client), "client source has no auth header");
-  // behavioral proof: the fixture (hit by tests 3-6) never received an auth header
   const sawAuth = receivedHeaders.some((h) => h.authorization || h["x-api-key"]);
   assert.equal(sawAuth, false, "fixture received no Authorization/x-api-key header");
 }
