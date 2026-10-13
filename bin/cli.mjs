@@ -6,18 +6,15 @@ import { runGoldRush, renderGoldRush, DEFAULT_ENDPOINT } from "../src/gold-rush.
 const OBSERVATORY = "https://live-vps.sasame.online/public-mcp";
 const REPO = "https://github.com/shigeki7777/mcp-readiness";
 const CLAIM = "https://github.com/shigeki7777/sasame-mcp-observatory/issues/new?template=claim-passport.yml";
-const START = "https://srl-sasame.com/start";
-// Activation: a server can be DISCOVERED (crawled) without ever being CALLED.
-// The current new-user handoff is Capability Control Beta: free during beta and
-// no payment method required. Keep the historical pricing URL in machine output
-// for compatibility, but never infer current purchasability from this CLI.
+const GEC = "https://sasame.online/gec";
+// MCP readiness and the hosted Observatory remain SaSame capabilities. The company-wide
+// participation handoff is GEC: Projects, OPEN Demands, paid work, agent participation,
+// and verified outcomes. Legacy Gold Rush commands remain compatibility-only.
 const ACTIVATION = {
   baseline_url: "https://live-vps.sasame.online/observatory/check/",
-  pricing_url: "https://srl-sasame.com/pricing",
-  beta_url: START,
-  beta_name: "Capability Control Beta",
-  beta_access: "free",
-  payment_method_required: false,
+  gec_url: GEC,
+  gec_name: "SaSame Global Ecosystem (GEC)",
+  participation: "Projects, OPEN Demands, paid work, agent participation, verified outcomes",
 };
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
@@ -47,9 +44,10 @@ ${bold("What it checks")} (10 criteria, A>=10 · B>=8 · C>=5 · D below)
   C8 machine identity   C9 token efficiency   C10 honest errors
   + advisory Claude/ChatGPT directory pre-flight
 
-${bold("SaSame free beta handoff")}
-  ${START}
-  Current new-user path: Capability Control Beta — free during beta, no payment method required.
+${bold("SaSame GEC handoff")}
+  ${GEC}
+  Current company-wide path: GEC — browse Projects and OPEN Demands, find paid work,
+  start a Project or Demand, connect an agent, and review verified Success Cases.
 
 ${bold("Legacy compatibility — Gold Rush v1")} (measurement only, no payment, no key)
   npx mcp-readiness gold-rush start <mcp-url> [--goal <preset>]   # create/identify a package
@@ -61,7 +59,7 @@ ${bold("Legacy compatibility — Gold Rush v1")} (measurement only, no payment, 
 ${bold("Exit codes")}  0 = grade A/B (or gold-rush ok) · 1 = grade C/D incl. unreachable-D (or tool error) · 2 = usage error
 ${bold("Flags")}  --json machine-readable · --no-color plain output
 
-Grades reproduce the hosted SaSame MCP Observatory (grade-over-time, signed certs): ${OBSERVATORY}
+Grades reproduce the hosted SaSame MCP Observatory capability (grade-over-time, signed certs): ${OBSERVATORY}
 If this is your MCP, claim the free owner-controlled Passport after the grade: ${CLAIM}
 `);
 }
@@ -143,19 +141,18 @@ const ok = (b) => (b ? C("32", "PASS") : C("31", "FAIL"));
     }
   }
   console.log("");
-  console.log(`  ${dim("Reproduce / track grade over time at the SaSame MCP Observatory:")}`);
+  console.log(`  ${dim("Reproduce / track grade over time at the SaSame MCP Observatory capability:")}`);
   console.log(`  ${dim(OBSERVATORY + "  (free, no key)")}`);
   console.log(`  ${bold("Claim this server")}  ${dim("If this is your MCP, claim the free owner-controlled Passport:")}`);
   console.log(`  ${dim(CLAIM)}`);
   console.log(`  ${dim("Or connect the SaSame public MCP and call claim_start(url) → claim_confirm.")}`);
   console.log("");
   console.log(`  ${bold("Agents may DISCOVER this server without ever CALLING its tools.")}`);
-  console.log(`  Free activation baseline ${dim("(observed discovery vs. real tool calls)")}:`);
+  console.log(`  Readiness baseline ${dim("(observed discovery vs. real tool calls)")}:`);
   console.log(`    ${ACTIVATION.baseline_url}  ${dim("(find your server, or ask via /public-mcp start_here)")}`);
-  console.log(`  ${bold("Continue with SaSame")}  Capability Control Beta is the current new-user path:`);
-  console.log(`    ${ACTIVATION.beta_url}  ${dim("(free during beta · no payment method required)")}`);
-  console.log(`  ${dim("Plan records and current availability remain published at:")}`);
-  console.log(`    ${ACTIVATION.pricing_url}`);
+  console.log(`  ${bold("Continue with SaSame GEC")}`);
+  console.log(`    ${ACTIVATION.gec_url}`);
+  console.log(`    ${dim(ACTIVATION.participation)}`);
   console.log("");
   console.log(`  ${dim("Think a check is wrong or unfair to your server? We'd genuinely like to be")}`);
   console.log(`  ${dim("corrected — open an issue: " + REPO + "/issues")}`);
